@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Gear Tracker navy, shared by the launcher icon and the launch screen. -->
+    <color name="ic_launcher_background">#060E20</color>
+    <color name="launch_background">#060E20</color>
+</resources>
