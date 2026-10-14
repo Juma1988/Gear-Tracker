@@ -15,4 +15,7 @@ final initialServices = [
   ),
 ];
 
-final initialTires = TireItem.defaultsForOdometer(int.parse(initialOdometer));
+final initialTires = initialTiresForOdometer(int.parse(initialOdometer));
+
+List<TireItem> initialTiresForOdometer(int odometer, {DateTime? now}) =>
+    TireItem.defaultsForOdometer(odometer, now: now);

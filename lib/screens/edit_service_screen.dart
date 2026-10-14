@@ -1,27 +1,62 @@
 import 'package:flutter/material.dart';
 
 import '../models/service_item.dart';
+import '../models/service_form_input.dart';
+import '../models/service_history_entry.dart';
+import '../l10n/app_localizations.dart';
+import '../preferences/display_preferences.dart';
+import 'history_screen.dart';
+import '../theme/app_tokens.dart';
+import '../widgets/current_odometer_label.dart';
 import '../widgets/dev_overlay.dart';
+import '../widgets/date_input.dart';
+import '../widgets/tracking_mode_selector.dart';
+import '../widgets/gear_text_field.dart';
+import '../widgets/time_preset_chip.dart';
+
+class ServiceCompletionResult {
+  const ServiceCompletionResult({
+    required this.updatedService,
+    required this.historyEntry,
+  });
+
+  final ServiceItem updatedService;
+  final ServiceHistoryEntry historyEntry;
+}
 
 class EditServiceScreen extends StatefulWidget {
-  const EditServiceScreen({super.key, required this.service});
+  const EditServiceScreen({
+    super.key,
+    required this.service,
+    required this.currentOdometer,
+    this.allowDelete = false,
+    this.history = const [],
+    this.openCompletionOnLaunch = false,
+  });
 
   final ServiceItem service;
+  final int currentOdometer;
+  final bool allowDelete;
+  final List<ServiceHistoryEntry> history;
+  final bool openCompletionOnLaunch;
 
   @override
   State<EditServiceScreen> createState() => _EditServiceScreenState();
 }
 
 class _EditServiceScreenState extends State<EditServiceScreen> {
-  static const _surfaceLow = Color(0xFF131B2E);
-  static const _muted = Color(0xFFBBCABF);
-  static const _primary = Color(0xFF4EDEA3);
-
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _noteController;
   late final TextEditingController _intervalController;
+  late final TextEditingController _installKmController;
+  late final TextEditingController _shelfLifeMonthsController;
   late DateTime _installDate;
+  late ServiceTrackingMode _trackingMode;
+  late String _iconKey;
+  bool _showOptionalDetails = false;
+  bool _showGuidance = true;
+  bool _hasChanges = false;
 
   @override
   void initState() {
@@ -30,9 +65,104 @@ class _EditServiceScreenState extends State<EditServiceScreen> {
     _nameController = TextEditingController(text: widget.service.name);
     _noteController = TextEditingController(text: widget.service.note);
     _intervalController = TextEditingController(
-      text: widget.service.intervalKm.toString(),
+      text: widget.service.intervalKm?.toString() ?? '',
     );
+    _installKmController = TextEditingController(
+      text:
+          widget.service.serviceOdometer?.toString() ??
+          widget.currentOdometer.toString(),
+    );
+    _shelfLifeMonthsController = TextEditingController(
+      text: widget.service.shelfLifeMonths?.toString() ?? '',
+    );
+    _trackingMode = widget.service.tracksMileage && widget.service.tracksTime
+        ? ServiceTrackingMode.mileageAndTime
+        : widget.service.tracksTime
+        ? ServiceTrackingMode.time
+        : ServiceTrackingMode.mileage;
     _installDate = widget.service.installDate ?? DateTime.now();
+    _iconKey = widget.service.iconKey;
+    _showOptionalDetails = false;
+    _loadGuidancePreference();
+    if (widget.openCompletionOnLaunch) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _markServiced();
+      });
+    }
+  }
+
+  Future<void> _loadGuidancePreference() async {
+    final value = await DisplayPreferences.loadShowGuidance();
+    if (mounted) setState(() => _showGuidance = value);
+  }
+
+  void _markChanged([String? _]) {
+    setState(() => _hasChanges = true);
+  }
+
+  Future<bool> _confirmDiscard() async {
+    if (!_hasChanges) return true;
+    final l10n = AppLocalizations.of(context);
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(l10n.discardChangesQuestion),
+            content: Text(l10n.discardChangesMessage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(l10n.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(l10n.discard),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _changeIcon() async {
+    const iconKeys = [
+      'oil',
+      'brake_pads',
+      'air_filter',
+      'battery',
+      'coolant',
+      'tires',
+      'maintenance',
+    ];
+    final selectedKey = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final key in iconKeys)
+              ListTile(
+                leading: Icon(ServiceItem.iconForKey(key)),
+                title: Text(
+                  AppLocalizations.of(sheetContext).serviceIconLabel(key),
+                ),
+                onTap: () => Navigator.pop(sheetContext, key),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || selectedKey == null) return;
+    setState(() {
+      _iconKey = selectedKey;
+      _hasChanges = true;
+    });
+  }
+
+  void _setTimePreset(int months) {
+    setState(() {
+      _shelfLifeMonthsController.text = months.toString();
+      _hasChanges = true;
+    });
   }
 
   @override
@@ -40,6 +170,8 @@ class _EditServiceScreenState extends State<EditServiceScreen> {
     _nameController.dispose();
     _noteController.dispose();
     _intervalController.dispose();
+    _installKmController.dispose();
+    _shelfLifeMonthsController.dispose();
     super.dispose();
   }
 
@@ -50,124 +182,445 @@ class _EditServiceScreenState extends State<EditServiceScreen> {
       widget.service.copyWith(
         name: _nameController.text.trim(),
         note: _noteController.text.trim(),
-        intervalKm: int.parse(_intervalController.text.trim()),
-        installDate: _installDate,
+        iconKey: _iconKey,
+        intervalKm: _tracksMileage
+            ? int.parse(_intervalController.text.trim())
+            : null,
+        serviceOdometer: _tracksMileage
+            ? int.parse(_installKmController.text.trim())
+            : null,
+        installDate: _tracksTime ? _installDate : null,
+        shelfLifeMonths: _tracksTime
+            ? int.parse(_shelfLifeMonthsController.text.trim())
+            : null,
+        units: widget.service.type == ServiceType.type02
+            ? [
+                for (final unit in widget.service.units)
+                  ServiceUnit(
+                    position: unit.position,
+                    installOdometer: int.parse(
+                      _installKmController.text.trim(),
+                    ),
+                  ),
+              ]
+            : const [],
       ),
     );
   }
 
-  Future<void> _selectInstallDate() async {
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: _installDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
-      helpText: 'Select install date',
+  Future<void> _markServiced() async {
+    final now = DateTime.now();
+    final completedAt = DateTime(now.year, now.month, now.day);
+    final completedOdometer = widget.service.tracksMileage
+        ? widget.currentOdometer
+        : null;
+
+    final updatedService = widget.service.copyWith(
+      serviceOdometer: widget.service.tracksMileage ? completedOdometer : null,
+      installDate: completedAt,
+      units:
+          widget.service.type == ServiceType.type02 && completedOdometer != null
+          ? [
+              for (final unit in widget.service.units)
+                ServiceUnit(
+                  position: unit.position,
+                  installOdometer: completedOdometer,
+                ),
+            ]
+          : const [],
     );
-    if (selected != null && mounted) setState(() => _installDate = selected);
+    Navigator.pop(
+      context,
+      ServiceCompletionResult(
+        updatedService: updatedService,
+        historyEntry: ServiceHistoryEntry(
+          id: _newCompletionEventId(),
+          serviceId: widget.service.id,
+          serviceName: widget.service.name,
+          previousServiceOdometer: widget.service.tracksMileage
+              ? widget.service.serviceOdometer
+              : null,
+          completedOdometer: completedOdometer,
+          newNote: widget.service.note,
+          newIntervalKm: widget.service.intervalKm,
+          completedAt: completedAt,
+        ),
+      ),
+    );
   }
 
-  String _formatDate(DateTime value) =>
-      '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  Future<void> _delete() async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.deleteServiceQuestion),
+        content: Text(l10n.removeService(widget.service.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      Navigator.pop(context, ServiceEditResult.delete);
+    }
+  }
+
+  void _openHistory() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => HistoryScreen(
+          history: widget.history,
+          serviceId: widget.service.id,
+          serviceName: widget.service.name,
+        ),
+      ),
+    );
+  }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Edit Service')),
-    body: SafeArea(
-      child: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _surfaceLow,
-                borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = Theme.of(context).colorScheme;
+    return PopScope(
+      canPop: !_hasChanges,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop || !await _confirmDiscard() || !context.mounted) return;
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.editServiceTitle),
+          actions: [
+            Semantics(
+              button: true,
+              label: l10n.viewHistory(widget.service.name),
+              child: SizedBox(
+                width: AppTokens.tapTargetSize,
+                height: AppTokens.tapTargetSize,
+                child: IconButton(
+                  key: const Key('edit-service-history-button'),
+                  onPressed: _openHistory,
+                  tooltip: l10n.viewHistory(widget.service.name),
+                  icon: const Icon(Icons.history_outlined),
+                ),
               ),
-              child: Row(
-                children: [
-                  Icon(widget.service.icon, color: _primary, size: 28),
-                  const SizedBox(width: 12),
-                  const Expanded(
+            ),
+            if (widget.allowDelete)
+              IconButton(
+                key: const Key('edit-service-delete-app-bar-button'),
+                onPressed: _delete,
+                tooltip: l10n.deleteService,
+                color: colors.error,
+                icon: const Icon(Icons.delete_outline),
+              ),
+          ],
+        ),
+        body: SafeArea(
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                CurrentOdometerLabel(odometer: widget.currentOdometer),
+                const SizedBox(height: 0),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            ServiceItem.iconForKey(_iconKey),
+                            color: colors.primary,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              l10n.serviceDetails,
+                              style: AppTokens.sectionTitleStyle,
+                            ),
+                          ),
+                          TextButton.icon(
+                            key: const Key('edit-service-change-icon-button'),
+                            onPressed: _changeIcon,
+                            icon: const Icon(
+                              Icons.edit_outlined,
+                              color: Colors.red,
+                            ),
+                            label: Text(
+                              l10n.changeIcon,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      GearTextField(
+                        key: const Key('service-name-field'),
+                        controller: _nameController,
+                        onChanged: _markChanged,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: InputDecoration(
+                          labelText: l10n.serviceName,
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: _requiredField(l10n.enterServiceName),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        key: const Key('edit-service-optional-details-toggle'),
+                        onPressed: () => setState(() {
+                          _showOptionalDetails = !_showOptionalDetails;
+                          _hasChanges = true;
+                        }),
+                        icon: Icon(
+                          _showOptionalDetails
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                        ),
+                        label: Text(
+                          _showOptionalDetails
+                              ? l10n.hideDetails
+                              : l10n.addNote,
+                        ),
+                      ),
+                      if (_showOptionalDetails) ...[
+                        const SizedBox(height: 8),
+                        GearTextField(
+                          key: const Key('service-note-field'),
+                          controller: _noteController,
+                          onChanged: _markChanged,
+                          decoration: InputDecoration(
+                            labelText: l10n.note,
+                            hintText: l10n.serviceNoteHint,
+                            border: const OutlineInputBorder(),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TrackingModeSelector(
+                  value: _trackingMode,
+                  mileageComplete: _mileageInputsComplete,
+                  timeComplete: _timeInputsComplete,
+                  onChanged: (value) => setState(() {
+                    _trackingMode = value;
+                    _hasChanges = true;
+                  }),
+                ),
+                const SizedBox(height: 16),
+                if (_tracksMileage)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_tracksMileage)
+                          GearTextField(
+                            key: const Key('service-install-km-field'),
+                            controller: _installKmController,
+                            onChanged: _markChanged,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: l10n.installKm,
+                              suffixText: l10n.kilometersFieldSuffix,
+                              border: const OutlineInputBorder(),
+                            ),
+                            validator: (value) => switch (installKmProblem(
+                              value ?? '',
+                              currentOdometer: widget.currentOdometer,
+                            )) {
+                              null => null,
+                              ServiceFieldProblem.odometerAheadOfCurrent =>
+                                l10n.installKmCannotExceedCurrent,
+                              _ => l10n.enterValidInstallKm,
+                            },
+                          ),
+                        const SizedBox(height: 16),
+                        GearTextField(
+                          key: const Key('service-interval-field'),
+                          controller: _intervalController,
+                          onChanged: _markChanged,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: l10n.serviceInterval,
+                            suffixText: l10n.kilometersFieldSuffix,
+                            border: const OutlineInputBorder(),
+                          ),
+                          validator: (value) =>
+                              positiveIntProblem(value ?? '') == null
+                              ? null
+                              : l10n.enterPositiveServiceInterval,
+                        ),
+                      ],
+                    ),
+                  ),
+                if (_tracksMileage && _tracksTime) const SizedBox(height: 16),
+                if (_tracksTime)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        DateInput(
+                          value: _installDate,
+                          onChanged: (value) => setState(() {
+                            _installDate = value;
+                            _hasChanges = true;
+                          }),
+                          label: l10n.installedOn,
+                          fieldKey: const Key('service-install-date-button'),
+                          sheetKey: const Key('service-install-date-sheet'),
+                          wheelKey: const Key('service-install-date-wheel'),
+                          cancelKey: const Key('service-install-date-cancel'),
+                          doneKey: const Key('service-install-date-done'),
+                        ),
+                        const SizedBox(height: 16),
+                        GearTextField(
+                          key: const Key('service-shelf-life-months-field'),
+                          controller: _shelfLifeMonthsController,
+                          onChanged: _markChanged,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: l10n.repeatEvery,
+                            suffixText: l10n.months,
+                            border: const OutlineInputBorder(),
+                          ),
+                          validator: (value) =>
+                              positiveIntProblem(value ?? '') == null
+                              ? null
+                              : l10n.enterPositiveShelfLife,
+                        ),
+                        if (_tracksTime) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TimePresetChip(
+                                  label: l10n.timePresetOneYear,
+                                  onPressed: () => _setTimePreset(12),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: TimePresetChip(
+                                  label: l10n.timePresetTwoYears,
+                                  onPressed: () => _setTimePreset(24),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: TimePresetChip(
+                                  label: l10n.timePresetThreeYears,
+                                  onPressed: () => _setTimePreset(36),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: TimePresetChip(
+                                  label: l10n.timePresetFiveYears,
+                                  onPressed: () => _setTimePreset(60),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                if (_showGuidance) ...[
+                  const SizedBox(height: 8),
+                  Tooltip(
+                    message: l10n.serviceConfigurationInstruction,
                     child: Text(
-                      'Service details',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                      l10n.serviceConfigurationInstruction,
+                      style: AppTokens.bodyStyle.copyWith(
+                        color: colors.onSurface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Tooltip(
+                    message: l10n.intervalEstimateNote,
+                    child: Text(
+                      l10n.intervalEstimateNote,
+                      style: AppTokens.bodyStyle.copyWith(
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
-            const SizedBox(height: 24),
-            TextFormField(
-              key: const Key('service-name-field'),
-              controller: _nameController,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Service name',
-                border: OutlineInputBorder(),
-              ),
-              validator: _requiredField('Enter a service name'),
+          ),
+        ),
+        bottomNavigationBar: SafeArea(
+          minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton.icon(
+            key: const Key('save-service-button'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              key: const Key('service-install-date-button'),
-              onPressed: _selectInstallDate,
-              icon: const Icon(Icons.calendar_today),
-              label: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Install date: ${_formatDate(_installDate)}'),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              key: const Key('service-note-field'),
-              controller: _noteController,
-              decoration: const InputDecoration(
-                labelText: 'Note',
-                hintText: 'For example, 5W-40 SYN',
-                border: OutlineInputBorder(),
-              ),
-              validator: _requiredField('Enter a note'),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              key: const Key('service-interval-field'),
-              controller: _intervalController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Service interval',
-                suffixText: 'KM',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                final interval = int.tryParse(value?.trim() ?? '');
-                return interval == null || interval <= 0
-                    ? 'Enter an interval greater than 0 KM'
-                    : null;
-              },
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'This changes the service configuration. Use Update when the service has been replaced.',
-              style: TextStyle(color: _muted, fontSize: 12),
-            ),
-            const SizedBox(height: 32),
-            FilledButton.icon(
-              key: const Key('save-service-button'),
-              onPressed: _save,
-              icon: const Icon(Icons.save),
-              label: const Text('Save changes'),
-            ),
-          ],
+            onPressed: _save,
+            icon: const Icon(Icons.save),
+            label: Text(l10n.saveChanges),
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   String? Function(String?) _requiredField(String message) =>
       (value) => value == null || value.trim().isEmpty ? message : null;
+
+  bool get _tracksMileage =>
+      _trackingMode == ServiceTrackingMode.mileage ||
+      _trackingMode == ServiceTrackingMode.mileageAndTime;
+
+  bool get _tracksTime =>
+      _trackingMode == ServiceTrackingMode.time ||
+      _trackingMode == ServiceTrackingMode.mileageAndTime;
+
+  bool get _mileageInputsComplete =>
+      installKmProblem(
+            _installKmController.text,
+            currentOdometer: widget.currentOdometer,
+          ) ==
+          null &&
+      positiveIntProblem(_intervalController.text) == null;
+
+  bool get _timeInputsComplete =>
+      positiveIntProblem(_shelfLifeMonthsController.text) == null;
+}
+
+enum ServiceEditResult { delete }
+
+String _newCompletionEventId() {
+  final timestamp = DateTime.now().microsecondsSinceEpoch.toRadixString(16);
+  return 'service-$timestamp';
 }

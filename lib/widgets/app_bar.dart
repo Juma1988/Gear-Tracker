@@ -1,92 +1,151 @@
 import 'package:flutter/material.dart';
 
-import '../models/valuables.dart';
+import '../l10n/app_localizations.dart';
+import '../models/maintenance_health.dart';
+import '../theme/app_tokens.dart';
+import 'brand_mark.dart';
 
-class AppBar extends StatelessWidget {
-  const AppBar({super.key, required this.onSettings, required this.onVehicle});
+class AppBar extends StatefulWidget {
+  const AppBar({
+    super.key,
+    this.vehicleName = '2022 Golf GTI',
+    required this.onSettings,
+    required this.onVehicle,
+    this.onAdd,
+    this.status = ServiceStatus.excellent,
+  });
 
+  final String vehicleName;
   final VoidCallback onSettings;
   final VoidCallback onVehicle;
+  final VoidCallback? onAdd;
+  final ServiceStatus status;
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: 80,
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    decoration: const BoxDecoration(
-      color: surfaceLowest,
-      boxShadow: [
-        BoxShadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 1)),
-      ],
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: primary,
-            borderRadius: BorderRadius.circular(8),
+  State<AppBar> createState() => _AppBarState();
+}
+
+class _AppBarState extends State<AppBar> {
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      constraints: const BoxConstraints(minHeight: 80),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLowest,
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: .45),
+            blurRadius: 8,
+            offset: Offset(0, 1),
           ),
-          child: const Icon(
-            Icons.directions_car_filled,
-            color: Color(0xFF003824),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+            const BrandMark(size: AppTokens.headerMarkSize),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'GEAR TRACKER',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -.5,
-                    ),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text(
+                        'GEAR TRACKER',
+                        style: AppTokens.wordmarkStyle,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: primary,
-                      shape: BoxShape.circle,
+                  Semantics(
+                    button: true,
+                    label: l10n.selectVehicle,
+                    excludeSemantics: true,
+                    child: InkWell(
+                      onTap: widget.onVehicle,
+                      child: Wrap(
+                        alignment: WrapAlignment.start,
+                        children: [
+                          Text(
+                            widget.vehicleName.toUpperCase(),
+                            style: AppTokens.labelStyle.copyWith(
+                              color: colors.onSurfaceVariant,
+                              fontWeight: AppTokens.fontWeightSemiBold,
+                              letterSpacing: AppTokens.letterSpacingWide,
+                            ),
+                          ),
+                          Icon(
+                            Icons.unfold_more,
+                            size: 15,
+                            color: colors.outline,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
-              InkWell(
-                onTap: onVehicle,
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '2022 Golf GTI',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: muted,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    Icon(Icons.unfold_more, size: 15, color: outline),
-                  ],
-                ),
-              ),
-            ],
+            ),
+            const SizedBox(width: 8),
+            _HeaderAction(
+              onPressed: widget.onAdd,
+              tooltip: l10n.addService,
+              icon: Icons.add,
+              emphasized: true,
+            ),
+            const SizedBox(width: 4),
+            _HeaderAction(
+              onPressed: widget.onSettings,
+              tooltip: l10n.settingsTitle,
+              icon: Icons.settings_outlined,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderAction extends StatelessWidget {
+  const _HeaderAction({
+    required this.onPressed,
+    required this.tooltip,
+    required this.icon,
+    this.emphasized = false,
+  });
+
+  final VoidCallback? onPressed;
+  final String tooltip;
+  final IconData icon;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: Semantics(
+        container: true,
+        child: SizedBox(
+          width: AppTokens.tapTargetSize,
+          height: AppTokens.tapTargetSize,
+          child: IconButton(
+            onPressed: onPressed,
+            tooltip: tooltip,
+            style: emphasized
+                ? IconButton.styleFrom(
+                    backgroundColor: colors.surfaceContainerHigh,
+                  )
+                : null,
+            icon: Icon(icon, color: colors.onSurface),
           ),
         ),
-        IconButton(
-          onPressed: onSettings,
-          tooltip: 'Settings',
-          style: IconButton.styleFrom(backgroundColor: surfaceHigh),
-          icon: const Icon(Icons.add, color: onSurface),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }

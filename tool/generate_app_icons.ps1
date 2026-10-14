@@ -130,7 +130,8 @@ function Save-Icon([System.Drawing.Bitmap]$bitmap, [string]$path) {
 
 # Renders the flat gear used on the splash and Android 12+ system splash.
 function New-LogoBitmap([int]$size) {
-    return New-IconBitmap -size $size -opaque $false -gearScale 0.82 -cornerScale 0
+    # Keep the Android launch mark comfortably inside the system splash safe area.
+    return New-IconBitmap -size $size -opaque $false -gearScale 0.36 -cornerScale 0
 }
 
 Write-Host 'Master icon'

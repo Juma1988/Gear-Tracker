@@ -23,9 +23,11 @@ Built with Flutter, the interface pairs deep navy surfaces with mint accents and
 | **A hands-on odometer** | Six directly scrollable digit wheels, with carry/borrow between digits and debounced auto-save. Maintenance cards recalculate from the saved KM reading. |
 | **Mileage-based service health** | Remaining kilometers, health bars, and status labels calculated from the installation reading and configured interval. The initial service is Engine Oil. |
 | **Four-position tire tracking** | Individual FL, FR, BL, and BR mileage-health indicators in one card, with a header reflecting the worst tire status. |
-| **Editable service details** | Double-tap a service card and choose **Edit** to change its name, note, installation date, and interval. Service installation KM is not editable yet. |
+| **Service management** | Add one instance of each preset at a time (available again after deletion), or add custom services. Duplicate custom names show a confirmation rather than blocking creation. |
+| **Editable service details** | Tap a service card to change its name, note, installation date, installation KM, and interval. |
 | **Editable tire records** | Double-tap an individual tire to change its installation date, installation KM, and lifespan interval. |
 | **On-device storage** | Odometer, service configuration, and tire records are serialized as a JSON snapshot through `shared_preferences`. No cloud sync is implemented. |
+| **Dashboard navigation** | Header history shows all records. Each service card also has a history button that filters records by that service's stable ID. Settings and Services remain available from the dashboard. |
 
 ### Reading the dashboard
 
@@ -45,11 +47,11 @@ These are **mileage-based estimates**, not measured component condition. Install
 
 1. Open the dashboard. A fresh installation starts with **74,850 KM**, an Engine Oil entry, and four tire records from [`lib/data/data.dart`](lib/data/data.dart)—starter data, not readings from your vehicle.
 2. Scroll an odometer digit. After editing settles, the dashboard waits two seconds before saving the staged reading and refreshing maintenance values.
-3. Double-tap **Engine Oil → Edit** to adjust its details, or double-tap a tire position to edit that tire.
+3. Tap **Engine Oil** to adjust its details, use its history button for its own history, or tap a tire position to edit that tire.
 
-**Current limits:** History and Services tabs are placeholder screens. **Update** only displays a message; it does not record a replacement. The header `+` and vehicle selector also display coming-soon messages. There is no add/delete-service flow, backup import/export, multi-vehicle management, or localization yet; the UI is English and uses kilometers.
+**Current limits:** Services and Settings have minimal placeholder content. The app does not yet create completion records, so history only displays records already present in local data. The vehicle selector also displays a coming-soon message. There is no backup import/export or multi-vehicle management yet; the UI is English and uses kilometers.
 
-Local storage is not a backup. History is not maintained by the dashboard, and storage recovery/schema migration still need hardening. Avoid using this development build as your only maintenance record. Odometer interaction and save-feedback behavior also remain under investigation.
+Local storage is not a backup. A malformed or unsupported local snapshot resets to the starter garage state; history is retained by dashboard saves. Avoid using this development build as your only maintenance record.
 
 ## Run locally
 
@@ -78,17 +80,15 @@ Replace `<device-id>` with an Android device/emulator or, on macOS, an iOS targe
 | iOS | Project configuration and app assets are present. No iOS build or runtime verification is claimed. |
 | Web / desktop | No platform runner directories are included; support is not claimed. |
 
-Android release configuration currently uses debug signing. It is not ready for store distribution.
+Android release signing is user-owned. Copy [`android/key.properties.example`](android/key.properties.example) to the ignored `android/key.properties`, provide local keystore details, and keep both the keystore and credentials out of Git. Without that file, release artifacts are unsigned and not ready for store distribution.
 
 ## Under the hood
 
 - **UI:** Flutter, Dart, Material 3, and reusable service-health cards.
 - **State:** Local widget state with staged/saved odometer values and editor results returned through Navigator.
-- **Rules:** Service and tire models calculate mileage health, remaining distance, and status.
+- **Rules:** A shared maintenance-health policy calculates mileage health, remaining distance, and status for services and tires.
 - **Persistence:** `GarageRepository` stores the active JSON snapshot using `shared_preferences`.
 - **Checks:** `flutter_test` and `flutter_lints`.
-
-`path_provider`, `share_plus`, `file_picker`, and `receive_sharing_intent` are also declared dependencies. Their presence does **not** mean backup or sharing flows are implemented.
 
 ```text
 lib/
@@ -112,7 +112,7 @@ flutter test
 Executed on **2026-10-06** with Flutter 3.47.5 / Dart 3.13.4:
 
 - `flutter analyze`: **no issues found**.
-- `flutter test`: **21 tests passed**.
+- `flutter test`: **32 tests passed**.
 
 The suite covers dashboard rendering, placeholder navigation, mileage calculations, odometer digit behavior, health-card states, and editor results. These are focused developer checks—not independent QA, end-to-end persistence verification, or a guarantee of platform readiness.
 
