@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/kaankiziltug/logo-design-skill.git",
+  "revision": "0ecf52e9a4b3ac92b714f7cc6e3148ab8c774134",
+  "subtree": "skills/logo-design",
+  "installedOn": "2026-10-06",
+  "upstreamSubtreeFiles": 1462,
+  "upstreamSubtreeModified": false,
+  "additionalUpstreamFiles": ["LICENSE", "TRADEMARKS.md"],
+  "verification": "Installed subtree and notices SHA-256 matched the cloned source byte-for-byte."
+}

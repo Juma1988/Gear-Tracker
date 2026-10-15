@@ -1,0 +1,28 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "eve",
+  "subagent_depth": 1,
+  "instructions": [".opencode/TEAM.md"],
+  "agents": {
+    "eve": {
+      "mode": "primary",
+      "permissions": [
+        { "action": "subagent", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "adam", "effect": "allow" },
+        { "action": "subagent", "resource": "kira", "effect": "allow" },
+        { "action": "subagent", "resource": "lana", "effect": "allow" },
+        { "action": "subagent", "resource": "mika", "effect": "allow" },
+        { "action": "subagent", "resource": "rei", "effect": "allow" },
+        { "action": "subagent", "resource": "sora", "effect": "allow" },
+        { "action": "subagent", "resource": "yuna", "effect": "allow" }
+      ]
+    },
+    "adam": { "mode": "subagent" },
+    "kira": { "mode": "subagent" },
+    "lana": { "mode": "subagent" },
+    "mika": { "mode": "subagent" },
+    "rei": { "mode": "subagent" },
+    "sora": { "mode": "subagent" },
+    "yuna": { "mode": "subagent" }
+  }
+}
