@@ -40,50 +40,55 @@ class CardActionMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return PopupMenuButton<String>(
+    return Semantics(
+      button: true,
+      label: tooltip,
       tooltip: tooltip,
-      borderRadius: borderRadius,
-      onSelected: (value) {
-        for (final action in actions) {
-          if (action.value == value) {
-            action.onSelected();
-            return;
+      child: PopupMenuButton<String>(
+        tooltip: tooltip,
+        borderRadius: borderRadius,
+        onSelected: (value) {
+          for (final action in actions) {
+            if (action.value == value) {
+              action.onSelected();
+              return;
+            }
           }
-        }
-      },
-      itemBuilder: (context) => [
-        for (final action in actions)
-          PopupMenuItem<String>(
-            value: action.value,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  action.icon,
-                  size: AppTokens.serviceIconGlyphSize,
-                  color: action.isDestructive
-                      ? colors.error
-                      : colors.onSurfaceVariant,
-                ),
-                const SizedBox(width: AppTokens.spaceMd),
-                Text(
-                  action.label,
-                  style: action.isDestructive
-                      ? TextStyle(color: colors.error)
-                      : null,
-                ),
-              ],
+        },
+        itemBuilder: (context) => [
+          for (final action in actions)
+            PopupMenuItem<String>(
+              value: action.value,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    action.icon,
+                    size: AppTokens.serviceIconGlyphSize,
+                    color: action.isDestructive
+                        ? colors.error
+                        : colors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: AppTokens.spaceMd),
+                  Text(
+                    action.label,
+                    style: action.isDestructive
+                        ? TextStyle(color: colors.error)
+                        : null,
+                  ),
+                ],
+              ),
             ),
-          ),
-      ],
-      child: SizedBox(
-        width: AppTokens.tapTargetSize,
-        height: AppTokens.tapTargetSize,
-        child: Center(
-          child: Icon(
-            Icons.more_vert,
-            size: AppTokens.serviceIconGlyphSize,
-            color: colors.onSurfaceVariant,
+        ],
+        child: SizedBox(
+          width: AppTokens.tapTargetSize,
+          height: AppTokens.tapTargetSize,
+          child: Center(
+            child: Icon(
+              Icons.more_vert,
+              size: AppTokens.serviceIconGlyphSize,
+              color: colors.onSurfaceVariant,
+            ),
           ),
         ),
       ),

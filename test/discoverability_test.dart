@@ -69,7 +69,9 @@ List<String> _serviceIds(String payload) {
 
 void main() {
   testWidgets('service presets are translated in Arabic', (tester) async {
-    await tester.pumpWidget(_localizedApp(const AddServiceScreen(), locale: Locale('ar')));
+    await tester.pumpWidget(
+      _localizedApp(const AddServiceScreen(), locale: Locale('ar')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('زيت المحرك'), findsOneWidget);
@@ -78,13 +80,35 @@ void main() {
     expect(find.text('السوائل والفلاتر'), findsOneWidget);
   });
 
+  testWidgets('Arabic preset autofills the service name in Arabic', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _localizedApp(const AddServiceScreen(), locale: const Locale('ar')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('service-preset-oil')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const Key('add-service-name-field')),
+          )
+          .controller!
+          .text,
+      'زيت المحرك',
+    );
+  });
+
   group('preset search', () {
     test('matches case-insensitively and trims the query', () {
       expect(filterServicePresets(''), hasLength(servicePickerPresets.length));
-      expect(
-        filterServicePresets('  BRAKE ').map((preset) => preset.name),
-        ['Brake pads', 'Brake fluid'],
-      );
+      expect(filterServicePresets('  BRAKE ').map((preset) => preset.name), [
+        'Brake pads',
+        'Brake fluid',
+      ]);
       expect(filterServicePresets('tire'), hasLength(2));
       expect(filterServicePresets('definitely-not-a-service'), isEmpty);
     });
@@ -129,7 +153,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('service-preset-brake_pads')), findsOneWidget);
+      expect(
+        find.byKey(const Key('service-preset-brake_pads')),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const Key('service-preset-brake_fluid')),
         findsOneWidget,
@@ -241,10 +268,7 @@ void main() {
       ];
       await tester.pumpWidget(
         _localizedApp(
-          VehicleSelectorScreen(
-            vehicles: vehicles,
-            selectedVehicleId: 'v1',
-          ),
+          VehicleSelectorScreen(vehicles: vehicles, selectedVehicleId: 'v1'),
         ),
       );
       await tester.pumpAndSettle();
@@ -293,8 +317,8 @@ void main() {
 
       // The dashboard presents the edit/service choice before opening the
       // editor for a card action.
-      expect(find.text(_l10n.edit), findsOneWidget);
-      await tester.tap(find.text(_l10n.edit));
+      expect(find.text(_l10n.editServiceHint), findsOneWidget);
+      await tester.tap(find.text(_l10n.editServiceHint));
       await tester.pumpAndSettle();
 
       expect(find.byType(EditServiceScreen), findsOneWidget);
@@ -374,17 +398,18 @@ Widget _dashboard(GarageStorage storage) => _localizedApp(
   DashboardScreen(repository: GarageRepository(storage: storage)),
 );
 
-Widget _localizedApp(Widget child, {Locale locale = const Locale('en')}) => MaterialApp(
-  locale: locale,
-  supportedLocales: AppLocalizations.supportedLocales,
-  localizationsDelegates: const [
-    AppLocalizations.delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-  ],
-  home: child,
-);
+Widget _localizedApp(Widget child, {Locale locale = const Locale('en')}) =>
+    MaterialApp(
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: child,
+    );
 
 class _RecordingStorage implements GarageStorage {
   _RecordingStorage(this.persistedPayload);

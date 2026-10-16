@@ -573,6 +573,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                                 currentOdometer: int.parse(_displayedOdometer),
                                 onEditTire: _editTire,
                                 compact: _compactTireHealth,
+                                hideAtNarrowLargeText: true,
                               ),
                           },
                           const SizedBox(height: 12),
@@ -1014,7 +1015,7 @@ class DashboardScreenState extends State<DashboardScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, 'edit'),
-            child: Text(l10n.edit),
+            child: Text(l10n.editServiceHint),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.pop(dialogContext, 'service'),

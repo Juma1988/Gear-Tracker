@@ -86,7 +86,7 @@ class _EditServiceScreenState extends State<EditServiceScreen> {
     _loadGuidancePreference();
     if (widget.openCompletionOnLaunch) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _markServiced();
+        if (mounted) _openCompletionForm();
       });
     }
   }
@@ -208,45 +208,225 @@ class _EditServiceScreenState extends State<EditServiceScreen> {
     );
   }
 
-  Future<void> _markServiced() async {
-    final now = DateTime.now();
-    final completedAt = DateTime(now.year, now.month, now.day);
-    final completedOdometer = widget.service.tracksMileage
-        ? widget.currentOdometer
-        : null;
-
-    final updatedService = widget.service.copyWith(
-      serviceOdometer: widget.service.tracksMileage ? completedOdometer : null,
-      installDate: completedAt,
-      units:
-          widget.service.type == ServiceType.type02 && completedOdometer != null
-          ? [
-              for (final unit in widget.service.units)
-                ServiceUnit(
-                  position: unit.position,
-                  installOdometer: completedOdometer,
-                ),
-            ]
-          : const [],
-    );
-    Navigator.pop(
-      context,
-      ServiceCompletionResult(
-        updatedService: updatedService,
-        historyEntry: ServiceHistoryEntry(
-          id: _newCompletionEventId(),
-          serviceId: widget.service.id,
-          serviceName: widget.service.name,
-          previousServiceOdometer: widget.service.tracksMileage
-              ? widget.service.serviceOdometer
-              : null,
-          completedOdometer: completedOdometer,
-          newNote: widget.service.note,
-          newIntervalKm: widget.service.intervalKm,
-          completedAt: completedAt,
+  Future<void> _openCompletionForm() async {
+    final l10n = AppLocalizations.of(context);
+    if (!widget.service.tracksMileage) {
+      final now = DateTime.now();
+      final day = DateTime(now.year, now.month, now.day);
+      Navigator.pop(
+        context,
+        ServiceCompletionResult(
+          updatedService: widget.service.copyWith(
+            serviceOdometer: null,
+            installDate: day,
+            units: const [],
+          ),
+          historyEntry: ServiceHistoryEntry(
+            id: _newCompletionEventId(),
+            serviceId: widget.service.id,
+            serviceName: widget.service.name,
+            previousServiceOdometer: null,
+            completedOdometer: null,
+            newNote: widget.service.note,
+            newIntervalKm: null,
+            completedAt: day,
+          ),
         ),
+      );
+      return;
+    }
+    final controller = TextEditingController(
+      text: widget.service.tracksMileage
+          ? widget.currentOdometer.toString()
+          : '',
+    );
+    var completedAt = DateTime.now();
+    String? error;
+    final result = await showDialog<ServiceCompletionResult>(
+      context: context,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final minimum = widget.service.serviceOdometer ?? 0;
+          final maximum = widget.currentOdometer;
+          final numbers = MaterialLocalizations.of(context);
+          final minimumLabel = numbers.formatDecimal(minimum);
+          final maximumLabel = numbers.formatDecimal(maximum);
+          return Material(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: SafeArea(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height * .72,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          l10n.markServiceServiced(widget.service.name),
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 12),
+                        if (widget.service.tracksMileage)
+                          TextField(
+                            key: const Key('service-completion-km-field'),
+                            controller: controller,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: l10n.completedKmLabel,
+                              helperText: l10n.completionKmHelperText(
+                                minimumLabel,
+                                maximumLabel,
+                              ),
+                              errorText: error,
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        OutlinedButton(
+                          key: const Key('service-completion-date-button'),
+                          onPressed: () async {
+                            final picked = await showModalBottomSheet<DateTime>(
+                              context: context,
+                              builder: (dateContext) => SafeArea(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      height: 150,
+                                      child: ListWheelScrollView.useDelegate(
+                                        key: const Key(
+                                          'service-completion-date-wheel',
+                                        ),
+                                        itemExtent: 44,
+                                        onSelectedItemChanged: (index) =>
+                                            setSheetState(
+                                              () => completedAt = DateTime.now()
+                                                  .add(
+                                                    Duration(days: index - 15),
+                                                  ),
+                                            ),
+                                        childDelegate:
+                                            ListWheelChildBuilderDelegate(
+                                              childCount: 31,
+                                              builder: (_, index) => Center(
+                                                child: Text(
+                                                  DateTime.now()
+                                                      .add(
+                                                        Duration(
+                                                          days: index - 15,
+                                                        ),
+                                                      )
+                                                      .toLocal()
+                                                      .toString()
+                                                      .split(' ')
+                                                      .first,
+                                                ),
+                                              ),
+                                            ),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      key: const Key(
+                                        'service-completion-date-done',
+                                      ),
+                                      onPressed: () => Navigator.pop(
+                                        dateContext,
+                                        completedAt,
+                                      ),
+                                      child: Text(l10n.done),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                            if (picked != null) {
+                              setSheetState(() => completedAt = picked);
+                            }
+                          },
+                          child: Text(
+                            '${l10n.completedOn}: ${completedAt.toLocal().toString().split(' ').first}',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          key: const Key('service-completion-confirm-button'),
+                          onPressed: () {
+                            final completedOdometer =
+                                widget.service.tracksMileage
+                                ? int.tryParse(controller.text.trim())
+                                : null;
+                            if (widget.service.tracksMileage &&
+                                (completedOdometer == null ||
+                                    completedOdometer < minimum ||
+                                    completedOdometer > maximum)) {
+                              setSheetState(
+                                () => error = l10n.enterCompletionKmRange(
+                                  minimumLabel,
+                                  maximumLabel,
+                                ),
+                              );
+                              return;
+                            }
+                            final updatedService = widget.service.copyWith(
+                              serviceOdometer: completedOdometer,
+                              installDate: DateTime(
+                                completedAt.year,
+                                completedAt.month,
+                                completedAt.day,
+                              ),
+                              units:
+                                  widget.service.type == ServiceType.type02 &&
+                                      completedOdometer != null
+                                  ? [
+                                      for (final unit in widget.service.units)
+                                        ServiceUnit(
+                                          position: unit.position,
+                                          installOdometer: completedOdometer,
+                                        ),
+                                    ]
+                                  : const [],
+                            );
+                            Navigator.pop(
+                              sheetContext,
+                              ServiceCompletionResult(
+                                updatedService: updatedService,
+                                historyEntry: ServiceHistoryEntry(
+                                  id: _newCompletionEventId(),
+                                  serviceId: widget.service.id,
+                                  serviceName: widget.service.name,
+                                  previousServiceOdometer:
+                                      widget.service.serviceOdometer,
+                                  completedOdometer: completedOdometer,
+                                  newNote: widget.service.note,
+                                  newIntervalKm: widget.service.intervalKm,
+                                  completedAt: DateTime(
+                                    completedAt.year,
+                                    completedAt.month,
+                                    completedAt.day,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          child: Text(l10n.confirmService),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
+    if (result != null && mounted) Navigator.pop(context, result);
+  }
+
+  Future<void> _markServiced() async {
+    await _openCompletionForm();
   }
 
   Future<void> _delete() async {
@@ -574,6 +754,13 @@ class _EditServiceScreenState extends State<EditServiceScreen> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  key: const Key('mark-service-button'),
+                  onPressed: _markServiced,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: Text(l10n.markServiceServiced(widget.service.name)),
+                ),
               ],
             ),
           ),

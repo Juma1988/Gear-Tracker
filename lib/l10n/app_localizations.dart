@@ -6,7 +6,11 @@ class AppLocalizations {
 
   final Locale locale;
 
-  static const supportedLocales = [Locale('en'), Locale('ar')];
+  static const supportedLocales = [
+    Locale('en'),
+    Locale('ar'),
+    Locale('ar', 'EG'),
+  ];
 
   static AppLocalizations of(BuildContext context) =>
       Localizations.of<AppLocalizations>(context, AppLocalizations) ??
@@ -16,6 +20,7 @@ class AppLocalizations {
       _AppLocalizationsDelegate();
 
   bool get isArabic => locale.languageCode == 'ar';
+  bool get isEgyptianArabic => isArabic && locale.countryCode == 'EG';
 
   String get remainingLifespan =>
       isArabic ? 'العمر المتبقي' : 'Remaining lifespan';
@@ -221,7 +226,7 @@ class AppLocalizations {
   String get done => isArabic ? 'تم' : 'Done';
   String get settingsTitle => isArabic ? 'الإعدادات' : 'Settings';
   String get appearanceSection => isArabic ? 'المظهر' : 'Appearance';
-  String get garageSection => isArabic ? 'الجراش' : 'Garage';
+  String get garageSection => isArabic ? 'الجراج' : 'Garage';
   String get notificationsSection => isArabic ? 'الإشعارات' : 'Notifications';
   String get backupRestoreSection =>
       isArabic ? 'النسخ الاحتياطي والاستعادة' : 'Backup & restore';
@@ -233,6 +238,11 @@ class AppLocalizations {
   String get language => isArabic ? 'اللغة' : 'Language';
   String get languageEnglish => 'English';
   String get languageArabic => 'العربية';
+  String get chooseLanguage => isArabic ? 'اختيار اللغة' : 'Choose language';
+  String get languageSettingsHint =>
+      isArabic ? 'اختر لغة التطبيق' : 'Choose the app language';
+  String get egyptianDialect =>
+      isArabic ? 'اللهجة المصرية' : 'Egyptian dialect';
   String get defaultVehicle =>
       isArabic ? 'المركبة الافتراضية' : 'Default vehicle';
   String defaultVehicleChangeTitle(String name) => isArabic
@@ -280,6 +290,11 @@ class AppLocalizations {
 
   String get backupAndRestore =>
       isArabic ? 'النسخ الاحتياطي والاستعادة' : 'Backup and restore';
+  String get backupPrivacySummary => isArabic
+      ? 'انسخ بياناتك أو استعدها يدويًا. النسخة الاحتياطية نص عادي خاص.'
+      : 'Copy or restore your data manually. Backups are private plain text.';
+  String get backupActionHint =>
+      isArabic ? 'اختر إجراءً للنسخة الاحتياطية' : 'Choose a backup action';
 
   String get backupGuidance => isArabic
       ? 'يُخزَّن مرآبك على هذا الجهاز فقط من دون تشفير التطبيق. النسخة الاحتياطية نص عادي في الحافظة؛ تعامل معها كبيانات خاصة.'
@@ -591,7 +606,8 @@ class AppLocalizations {
   String get enterYearBetween => isArabic
       ? 'أدخل سنة بين 1900 و 2100'
       : 'Enter a year between 1900 and 2100';
-  String get makeOptional => isArabic ? 'الصانع (اختياري)' : 'Make (optional)';
+  String get makeOptional =>
+      isArabic ? 'الشركة المصنعة (اختياري)' : 'Manufacturer (optional)';
   String get makeHint => isArabic ? 'Volkswagen' : 'Volkswagen';
   String get model => isArabic ? 'الطراز' : 'Model';
   String get modelHint => isArabic ? 'Golf GTI' : 'Golf GTI';
@@ -624,12 +640,21 @@ class AppLocalizations {
       isArabic ? 'لا توجد صيانة مطابقة' : 'No matching services';
   String get presetGroupMaintenance =>
       isArabic ? 'الصيانة الدورية' : 'Routine maintenance';
-  String get presetGroupBrakesAndTires =>
-      isArabic ? 'الفرامل والإطارات' : 'Brakes & tires';
-  String get presetGroupEngineAndDrivetrain =>
-      isArabic ? 'المحرك وناقل الحركة' : 'Engine & drivetrain';
-  String get presetGroupElectricalAndClimate =>
-      isArabic ? 'الكهرباء والتكييف' : 'Electrical & climate';
+  String get presetGroupBrakesAndTires => isEgyptianArabic
+      ? 'الفرامل والكاوتش'
+      : isArabic
+      ? 'الفرامل والإطارات'
+      : 'Brakes & tires';
+  String get presetGroupEngineAndDrivetrain => isEgyptianArabic
+      ? 'الموتور والفتيس'
+      : isArabic
+      ? 'المحرك وناقل الحركة'
+      : 'Engine & drivetrain';
+  String get presetGroupElectricalAndClimate => isEgyptianArabic
+      ? 'الكهربا والتكييف'
+      : isArabic
+      ? 'الكهرباء والتكييف'
+      : 'Electrical & climate';
   String get presetGroupEngine => isArabic ? 'المحرك' : 'Engine';
   String get presetGroupFluids =>
       isArabic ? 'السوائل والفلاتر' : 'Fluids & filters';
@@ -638,28 +663,109 @@ class AppLocalizations {
 
   String servicePresetName(String iconKey, String fallback) =>
       switch (iconKey) {
-        'oil' => isArabic ? 'زيت المحرك' : 'Engine oil',
-        'oil_filter' => isArabic ? 'فلتر الزيت' : 'Oil filter',
-        'air_filter' => isArabic ? 'فلتر الهواء' : 'Air filter',
-        'cabin_filter' => isArabic ? 'فلتر المقصورة' : 'Cabin filter',
-        'brake_pads' => isArabic ? 'تيل الفرامل' : 'Brake pads',
-        'brake_fluid' => isArabic ? 'سائل الفرامل' : 'Brake fluid',
+        'oil' =>
+          isEgyptianArabic
+              ? 'زيت موتور'
+              : isArabic
+              ? 'زيت المحرك'
+              : 'Engine oil',
+        'oil_filter' =>
+          isEgyptianArabic
+              ? 'فلتر زيت'
+              : isArabic
+              ? 'فلتر الزيت'
+              : 'Oil filter',
+        'air_filter' =>
+          isEgyptianArabic
+              ? 'فلتر هوا'
+              : isArabic
+              ? 'فلتر الهواء'
+              : 'Air filter',
+        'cabin_filter' =>
+          isEgyptianArabic
+              ? 'فلتر التكييف'
+              : isArabic
+              ? 'فلتر المقصورة'
+              : 'Cabin filter',
+        'brake_pads' =>
+          isEgyptianArabic
+              ? 'تيل فرامل'
+              : isArabic
+              ? 'تيل الفرامل'
+              : 'Brake pads',
+        'brake_fluid' =>
+          isEgyptianArabic
+              ? 'زيت فرامل'
+              : isArabic
+              ? 'سائل الفرامل'
+              : 'Brake fluid',
         'tires' =>
-          isArabic ? 'تدوير ومحاذاة الإطارات' : 'Tire rotation and alignment',
-        'tire_health' => isArabic ? 'حالة الإطارات' : 'Tire health',
+          isEgyptianArabic
+              ? 'تدوير الكاوتش وضبط الزوايا'
+              : isArabic
+              ? 'تدوير ومحاذاة الإطارات'
+              : 'Tire rotation and alignment',
+        'tire_health' =>
+          isEgyptianArabic
+              ? 'حالة الكاوتش'
+              : isArabic
+              ? 'حالة الإطارات'
+              : 'Tire health',
         'battery' => isArabic ? 'البطارية' : 'Battery',
-        'spark_plugs' => isArabic ? 'شمعات الإشعال' : 'Spark plugs',
-        'coolant' => isArabic ? 'سائل التبريد' : 'Coolant',
+        'spark_plugs' =>
+          isEgyptianArabic
+              ? 'بوجيهات'
+              : isArabic
+              ? 'شمعات الإشعال'
+              : 'Spark plugs',
+        'coolant' =>
+          isEgyptianArabic
+              ? 'مياه تبريد'
+              : isArabic
+              ? 'سائل التبريد'
+              : 'Coolant',
         'transmission_fluid' =>
-          isArabic ? 'سائل ناقل الحركة' : 'Transmission fluid',
-        'power_steering' => isArabic ? 'سائل التوجيه' : 'Power steering fluid',
+          isEgyptianArabic
+              ? 'زيت فتيس'
+              : isArabic
+              ? 'سائل ناقل الحركة'
+              : 'Transmission fluid',
+        'power_steering' =>
+          isEgyptianArabic
+              ? 'زيت باور'
+              : isArabic
+              ? 'سائل التوجيه'
+              : 'Power steering fluid',
         'timing_belt' =>
-          isArabic ? 'فحص سير/سلسلة التوقيت' : 'Timing belt / chain inspection',
-        'drive_belts' => isArabic ? 'سيور الحركة' : 'Drive belts',
-        'wipers' => isArabic ? 'شفرات المساحات' : 'Wiper blades',
+          isEgyptianArabic
+              ? 'فحص سير الكاتينة'
+              : isArabic
+              ? 'فحص سير/سلسلة التوقيت'
+              : 'Timing belt / chain inspection',
+        'drive_belts' =>
+          isEgyptianArabic
+              ? 'سير مجموعة'
+              : isArabic
+              ? 'سيور الحركة'
+              : 'Drive belts',
+        'wipers' =>
+          isEgyptianArabic
+              ? 'مساحات'
+              : isArabic
+              ? 'شفرات المساحات'
+              : 'Wiper blades',
         'suspension' =>
-          isArabic ? 'فحص التعليق والممتصات' : 'Suspension / shocks inspection',
-        'fuel_filter' => isArabic ? 'فلتر الوقود' : 'Fuel filter',
+          isEgyptianArabic
+              ? 'فحص العفشة والمساعدين'
+              : isArabic
+              ? 'فحص التعليق والممتصات'
+              : 'Suspension / shocks inspection',
+        'fuel_filter' =>
+          isEgyptianArabic
+              ? 'فلتر بنزين'
+              : isArabic
+              ? 'فلتر الوقود'
+              : 'Fuel filter',
         'ac' => isArabic ? 'صيانة التكييف' : 'AC service',
         'maintenance' => isArabic ? 'صيانة عامة' : 'General maintenance',
         _ => fallback,
@@ -667,47 +773,106 @@ class AppLocalizations {
 
   String servicePresetDescription(String iconKey) => switch (iconKey) {
     'oil' =>
-      isArabic ? 'يحافظ على تزييت المحرك' : 'Keeps the engine lubricated',
+      isEgyptianArabic
+          ? 'يحافظ على تزييت الموتور'
+          : isArabic
+          ? 'يحافظ على تزييت المحرك'
+          : 'Keeps the engine lubricated',
     'oil_filter' =>
-      isArabic ? 'ينقّي الزيت من الشوائب' : 'Removes contaminants from the oil',
+      isEgyptianArabic
+          ? 'بينقّي الزيت من الشوائب'
+          : isArabic
+          ? 'ينقّي الزيت من الشوائب'
+          : 'Removes contaminants from the oil',
     'air_filter' =>
-      isArabic
+      isEgyptianArabic
+          ? 'بينقّي الهوا الداخل للموتور'
+          : isArabic
           ? 'ينقّي الهواء الداخل للمحرك'
           : 'Cleans air entering the engine',
     'cabin_filter' =>
-      isArabic ? 'ينقّي الهواء داخل المقصورة' : 'Cleans air inside the cabin',
+      isEgyptianArabic
+          ? 'بينقّي الهوا جوه العربية'
+          : isArabic
+          ? 'ينقّي الهواء داخل المقصورة'
+          : 'Cleans air inside the cabin',
     'brake_pads' =>
-      isArabic ? 'يتابع تآكل بطانات الفرامل' : 'Tracks brake pad wear',
+      isEgyptianArabic
+          ? 'بيتابع تآكل تيل الفرامل'
+          : isArabic
+          ? 'يتابع تآكل بطانات الفرامل'
+          : 'Tracks brake pad wear',
     'brake_fluid' =>
-      isArabic ? 'يتابع سائل نظام الفرامل' : 'Tracks the brake system fluid',
+      isEgyptianArabic
+          ? 'بيتابع زيت الفرامل'
+          : isArabic
+          ? 'يتابع سائل نظام الفرامل'
+          : 'Tracks the brake system fluid',
     'tires' =>
-      isArabic ? 'يتابع التدوير والمحاذاة' : 'Tracks rotation and alignment',
+      isEgyptianArabic
+          ? 'بيتابع تدوير الكاوتش والزوايا'
+          : isArabic
+          ? 'يتابع التدوير والمحاذاة'
+          : 'Tracks rotation and alignment',
     'tire_health' =>
-      isArabic
+      isEgyptianArabic
+          ? 'بيتابع عمر الكاوتش الأربعة'
+          : isArabic
           ? 'يتابع عمر الإطارات الأربعة'
           : 'Tracks the life of all four tires',
     'battery' => isArabic ? 'يتابع حالة البطارية' : 'Tracks battery condition',
     'spark_plugs' =>
-      isArabic ? 'يتابع عمر شمعات الإشعال' : 'Tracks spark plug life',
-    'coolant' => isArabic ? 'يتابع سائل تبريد المحرك' : 'Tracks engine coolant',
+      isEgyptianArabic
+          ? 'يتابع عمر البوجيهات'
+          : isArabic
+          ? 'يتابع عمر شمعات الإشعال'
+          : 'Tracks spark plug life',
+    'coolant' =>
+      isEgyptianArabic
+          ? 'بيتابع مياه تبريد الموتور'
+          : isArabic
+          ? 'يتابع سائل تبريد المحرك'
+          : 'Tracks engine coolant',
     'transmission_fluid' =>
-      isArabic ? 'يتابع سائل ناقل الحركة' : 'Tracks transmission fluid',
+      isEgyptianArabic
+          ? 'بيتابع زيت الفتيس'
+          : isArabic
+          ? 'يتابع سائل ناقل الحركة'
+          : 'Tracks transmission fluid',
     'power_steering' =>
-      isArabic ? 'يتابع سائل التوجيه' : 'Tracks power steering fluid',
+      isEgyptianArabic
+          ? 'بيتابع زيت الباور'
+          : isArabic
+          ? 'يتابع سائل التوجيه'
+          : 'Tracks power steering fluid',
     'timing_belt' =>
-      isArabic
+      isEgyptianArabic
+          ? 'بيتابع سير الكاتينة'
+          : isArabic
           ? 'يتابع سير أو سلسلة التوقيت'
           : 'Tracks timing belt or chain service',
     'drive_belts' =>
-      isArabic ? 'يتابع حالة سيور الحركة' : 'Tracks drive belt condition',
+      isEgyptianArabic
+          ? 'بيتابع حالة سير المجموعة'
+          : isArabic
+          ? 'يتابع حالة سيور الحركة'
+          : 'Tracks drive belt condition',
     'wipers' =>
-      isArabic ? 'يتابع عمر شفرات المساحات' : 'Tracks wiper blade life',
+      isEgyptianArabic
+          ? 'بيتابع عمر المساحات'
+          : isArabic
+          ? 'يتابع عمر شفرات المساحات'
+          : 'Tracks wiper blade life',
     'suspension' =>
-      isArabic
+      isEgyptianArabic
+          ? 'بيتابع فحص العفشة والمساعدين'
+          : isArabic
           ? 'يتابع فحص التعليق والممتصات'
           : 'Tracks suspension and shock checks',
     'fuel_filter' =>
-      isArabic
+      isEgyptianArabic
+          ? 'بينقّي البنزين قبل ما يوصل للموتور'
+          : isArabic
           ? 'ينقّي الوقود قبل وصوله للمحرك'
           : 'Cleans fuel before it reaches the engine',
     'ac' =>
@@ -725,49 +890,70 @@ class AppLocalizations {
     if (!isArabic) return fallback;
     if (id.startsWith('demo-')) {
       return switch (id) {
-        'demo-engine-oil' => 'زيت المحرك',
-        'demo-brake-pads' => 'تيل الفرامل',
-        'demo-air-filter' => 'فلتر الهواء',
+        'demo-engine-oil' => isEgyptianArabic ? 'زيت موتور' : 'زيت المحرك',
+        'demo-brake-pads' => isEgyptianArabic ? 'تيل فرامل' : 'تيل الفرامل',
+        'demo-air-filter' => isEgyptianArabic ? 'فلتر هوا' : 'فلتر الهواء',
         'demo-battery' => 'فحص البطارية',
-        'demo-timing-belt' => 'سير التوقيت',
-        'demo-oil-filter' => 'فلتر الزيت',
-        'demo-cabin-filter' => 'فلتر المقصورة',
-        'demo-brake-fluid' => 'سائل الفرامل',
-        'demo-tire-rotation' => 'تدوير الإطارات',
-        'demo-spark-plugs' => 'شمعات الإشعال',
-        'demo-coolant' => 'سائل التبريد',
-        'demo-transmission-fluid' => 'سائل ناقل الحركة',
-        'demo-power-steering' => 'سائل التوجيه',
-        'demo-drive-belts' => 'سيور الحركة',
-        'demo-wipers' => 'شفرات المساحات',
-        'demo-suspension' => 'فحص التعليق',
-        'demo-fuel-filter' => 'فلتر الوقود',
+        'demo-timing-belt' => isEgyptianArabic ? 'سير الكاتينة' : 'سير التوقيت',
+        'demo-oil-filter' => isEgyptianArabic ? 'فلتر زيت' : 'فلتر الزيت',
+        'demo-cabin-filter' =>
+          isEgyptianArabic ? 'فلتر التكييف' : 'فلتر المقصورة',
+        'demo-brake-fluid' => isEgyptianArabic ? 'زيت فرامل' : 'سائل الفرامل',
+        'demo-tire-rotation' =>
+          isEgyptianArabic ? 'تدوير الكاوتش' : 'تدوير الإطارات',
+        'demo-spark-plugs' => isEgyptianArabic ? 'بوجيهات' : 'شمعات الإشعال',
+        'demo-coolant' => isEgyptianArabic ? 'مياه تبريد' : 'سائل التبريد',
+        'demo-transmission-fluid' =>
+          isEgyptianArabic ? 'زيت فتيس' : 'سائل ناقل الحركة',
+        'demo-power-steering' => isEgyptianArabic ? 'زيت باور' : 'سائل التوجيه',
+        'demo-drive-belts' => isEgyptianArabic ? 'سير مجموعة' : 'سيور الحركة',
+        'demo-wipers' => isEgyptianArabic ? 'مساحات' : 'شفرات المساحات',
+        'demo-suspension' => isEgyptianArabic ? 'فحص العفشة' : 'فحص التعليق',
+        'demo-fuel-filter' => isEgyptianArabic ? 'فلتر بنزين' : 'فلتر الوقود',
         'demo-ac-service' => 'صيانة التكييف',
-        'demo-coolant-change-now' => 'غيّر سائل التبريد الآن',
+        'demo-coolant-change-now' =>
+          isEgyptianArabic
+              ? 'غيّر مياه التبريد دلوقتي'
+              : 'غيّر سائل التبريد الآن',
         'demo-general-maintenance' => 'صيانة عامة',
         _ => servicePresetName(iconKey, fallback),
       };
     }
     return switch ((iconKey, fallback.toLowerCase())) {
-      ('oil', 'engine oil') => 'زيت المحرك',
-      ('oil_filter', 'oil filter') => 'فلتر الزيت',
-      ('air_filter', 'air filter') => 'فلتر الهواء',
-      ('cabin_filter', 'cabin filter') => 'فلتر المقصورة',
-      ('brake_pads', 'brake pads') => 'تيل الفرامل',
-      ('brake_fluid', 'brake fluid') => 'سائل الفرامل',
-      ('tires', 'tire rotation and alignment') => 'تدوير ومحاذاة الإطارات',
+      ('oil', 'engine oil') => isEgyptianArabic ? 'زيت موتور' : 'زيت المحرك',
+      ('oil_filter', 'oil filter') =>
+        isEgyptianArabic ? 'فلتر زيت' : 'فلتر الزيت',
+      ('air_filter', 'air filter') =>
+        isEgyptianArabic ? 'فلتر هوا' : 'فلتر الهواء',
+      ('cabin_filter', 'cabin filter') =>
+        isEgyptianArabic ? 'فلتر التكييف' : 'فلتر المقصورة',
+      ('brake_pads', 'brake pads') =>
+        isEgyptianArabic ? 'تيل فرامل' : 'تيل الفرامل',
+      ('brake_fluid', 'brake fluid') =>
+        isEgyptianArabic ? 'زيت فرامل' : 'سائل الفرامل',
+      ('tires', 'tire rotation and alignment') =>
+        isEgyptianArabic
+            ? 'تدوير الكاوتش وضبط الزوايا'
+            : 'تدوير ومحاذاة الإطارات',
       ('battery', 'battery') => 'البطارية',
-      ('spark_plugs', 'spark plugs') => 'شمعات الإشعال',
-      ('coolant', 'coolant') => 'سائل التبريد',
-      ('transmission_fluid', 'transmission fluid') => 'سائل ناقل الحركة',
-      ('power_steering', 'power steering fluid') => 'سائل التوجيه',
+      ('spark_plugs', 'spark plugs') =>
+        isEgyptianArabic ? 'بوجيهات' : 'شمعات الإشعال',
+      ('coolant', 'coolant') =>
+        isEgyptianArabic ? 'مياه تبريد' : 'سائل التبريد',
+      ('transmission_fluid', 'transmission fluid') =>
+        isEgyptianArabic ? 'زيت فتيس' : 'سائل ناقل الحركة',
+      ('power_steering', 'power steering fluid') =>
+        isEgyptianArabic ? 'زيت باور' : 'سائل التوجيه',
       ('timing_belt', 'timing belt / chain inspection') =>
-        'فحص سير/سلسلة التوقيت',
-      ('drive_belts', 'drive belts') => 'سيور الحركة',
-      ('wipers', 'wiper blades') => 'شفرات المساحات',
+        isEgyptianArabic ? 'فحص سير الكاتينة' : 'فحص سير/سلسلة التوقيت',
+      ('drive_belts', 'drive belts') =>
+        isEgyptianArabic ? 'سير مجموعة' : 'سيور الحركة',
+      ('wipers', 'wiper blades') =>
+        isEgyptianArabic ? 'مساحات' : 'شفرات المساحات',
       ('suspension', 'suspension / shocks inspection') =>
-        'فحص التعليق والممتصات',
-      ('fuel_filter', 'fuel filter') => 'فلتر الوقود',
+        isEgyptianArabic ? 'فحص العفشة والمساعدين' : 'فحص التعليق والممتصات',
+      ('fuel_filter', 'fuel filter') =>
+        isEgyptianArabic ? 'فلتر بنزين' : 'فلتر الوقود',
       ('ac', 'ac service') => 'صيانة التكييف',
       ('maintenance', 'general maintenance') => 'صيانة عامة',
       _ => fallback,
@@ -777,23 +963,66 @@ class AppLocalizations {
   String serviceCardNote({required String id, required String fallback}) {
     if (!id.startsWith('demo-') || !isArabic) return fallback;
     return switch (id) {
-      'demo-engine-oil' => 'زيت صناعي بالكامل 5W-30',
-      'demo-brake-pads' => 'فحص المحور الأمامي',
-      'demo-air-filter' => 'افحص الفلتر وبيت سحب الهواء',
+      'demo-engine-oil' =>
+        isEgyptianArabic
+            ? 'زيت موتور تخليقي بالكامل 5W-30'
+            : 'زيت صناعي بالكامل 5W-30',
+      'demo-brake-pads' =>
+        isEgyptianArabic ? 'افحص تيل الفرامل الأمامي' : 'فحص المحور الأمامي',
+      'demo-air-filter' =>
+        isEgyptianArabic
+            ? 'افحص الفلتر وبيت سحب الهوا'
+            : 'افحص الفلتر وبيت سحب الهواء',
       'demo-battery' => 'افحص الأقطاب ومستوى الشحن',
-      'demo-timing-belt' => 'الاستبدال حسب المسافة أو التاريخ',
-      'demo-oil-filter' => 'استبدله مع صيانة زيت المحرك',
-      'demo-cabin-filter' => 'استبدله للحفاظ على هواء المقصورة',
-      'demo-brake-fluid' => 'غيّر السائل وافحص مستوى الرطوبة',
-      'demo-tire-rotation' => 'دوّر الإطارات وافحص المحاذاة',
+      'demo-timing-belt' =>
+        isEgyptianArabic
+            ? 'غيّره حسب المسافة أو التاريخ'
+            : 'الاستبدال حسب المسافة أو التاريخ',
+      'demo-oil-filter' =>
+        isEgyptianArabic
+            ? 'غيّره مع صيانة زيت الموتور'
+            : 'استبدله مع صيانة زيت المحرك',
+      'demo-cabin-filter' =>
+        isEgyptianArabic
+            ? 'غيّره عشان تحافظ على هوا العربية'
+            : 'استبدله للحفاظ على هواء المقصورة',
+      'demo-brake-fluid' =>
+        isEgyptianArabic
+            ? 'غيّر زيت الفرامل وافحص مستواه'
+            : 'غيّر السائل وافحص مستوى الرطوبة',
+      'demo-tire-rotation' =>
+        isEgyptianArabic
+            ? 'دوّر الكاوتش واضبط الزوايا'
+            : 'دوّر الإطارات وافحص المحاذاة',
       'demo-spark-plugs' => 'افحص الفجوة وأداء الإشعال',
-      'demo-coolant' => 'افحص المستوى واللون والحماية من التجمد',
-      'demo-transmission-fluid' => 'افحص المستوى وجودة تبديل السرعات',
-      'demo-power-steering' => 'افحص مستوى السائل والتسربات',
-      'demo-drive-belts' => 'افحص الشد والتشققات والتآكل',
-      'demo-wipers' => 'استبدلها عند ظهور الخطوط أو الاهتزاز',
-      'demo-suspension' => 'افحص المساعدين والقواعد والجلب',
-      'demo-fuel-filter' => 'استبدله وافحص خطوط الوقود',
+      'demo-coolant' =>
+        isEgyptianArabic
+            ? 'افحص مستوى مياه التبريد ولونها'
+            : 'افحص المستوى واللون والحماية من التجمد',
+      'demo-transmission-fluid' =>
+        isEgyptianArabic
+            ? 'افحص مستوى زيت الفتيس وجودة النقلات'
+            : 'افحص المستوى وجودة تبديل السرعات',
+      'demo-power-steering' =>
+        isEgyptianArabic
+            ? 'افحص مستوى زيت الباور والتسريب'
+            : 'افحص مستوى السائل والتسربات',
+      'demo-drive-belts' =>
+        isEgyptianArabic
+            ? 'افحص شد سير المجموعة والتشققات والتآكل'
+            : 'افحص الشد والتشققات والتآكل',
+      'demo-wipers' =>
+        isEgyptianArabic
+            ? 'غيّرها لما تعمل خطوط أو تتهز'
+            : 'استبدلها عند ظهور الخطوط أو الاهتزاز',
+      'demo-suspension' =>
+        isEgyptianArabic
+            ? 'افحص المساعدين والقواعد والجلب'
+            : 'افحص المساعدين والقواعد والجلب',
+      'demo-fuel-filter' =>
+        isEgyptianArabic
+            ? 'غيّره وافحص خراطيم البنزين'
+            : 'استبدله وافحص خطوط الوقود',
       'demo-ac-service' => 'افحص أداء التبريد وغاز التكييف',
       'demo-coolant-change-now' => 'حان وقت الاستبدال',
       'demo-general-maintenance' => 'فحص موسمي وفحص السوائل',

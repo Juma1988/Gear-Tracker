@@ -224,7 +224,7 @@ class ShelfLifeStatus {
 
   bool get isExpired => daysRemaining < 0;
   bool get isDueOrExpired => daysRemaining <= 0;
-  bool get isWarning => remainingProgress < warningProgress;
+  bool get isWarning => remainingProgress <= warningProgress;
   bool get isCaution => remainingProgress < cautionProgress;
 }
 
@@ -244,8 +244,6 @@ class ServiceUrgencyPolicy {
         ? ServiceStatus.replaceNow
         : shelfLifeStatus.isWarning
         ? ServiceStatus.replaceSoon
-        : shelfLifeStatus.isCaution
-        ? ServiceStatus.warning
         : ServiceStatus.excellent;
     if (mileageStatus == null) return shelfLifeUrgency;
     return urgencyRank(shelfLifeUrgency) > urgencyRank(mileageStatus)
@@ -312,8 +310,6 @@ class ServiceUrgencyPolicy {
         ? ServiceStatus.replaceNow
         : shelfLifeStatus.isWarning
         ? ServiceStatus.replaceSoon
-        : shelfLifeStatus.isCaution
-        ? ServiceStatus.warning
         : ServiceStatus.excellent;
     if (metrics == null ||
         urgencyRank(shelfLifeUrgency) >= urgencyRank(metrics.status)) {

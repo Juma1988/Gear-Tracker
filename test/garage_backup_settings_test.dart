@@ -51,13 +51,9 @@ void main() {
     expect(find.byKey(const Key('settings-backup-card')), findsOneWidget);
     expect(find.text(_l10n.backupAndRestore), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('settings-backup-card')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('backup-dialog')), findsOneWidget);
-    expect(find.text(_l10n.localStorageTitle), findsOneWidget);
-    expect(find.text(_l10n.localStorageGuidance), findsOneWidget);
-    expect(find.text(_l10n.backupGuidance), findsWidgets);
+    expect(find.byKey(const Key('settings-backup-copy')), findsOneWidget);
+    expect(find.byKey(const Key('settings-backup-restore')), findsOneWidget);
+    expect(find.text(_l10n.backupPrivacySummary), findsOneWidget);
   });
 
   test('localizes storage, plaintext, and restore guidance in Arabic', () {
@@ -75,9 +71,7 @@ void main() {
     final clipboard = _FakeClipboard();
 
     await tester.pumpWidget(_app(storage: storage, clipboard: clipboard));
-    await tester.tap(find.byKey(const Key('settings-backup-card')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('backup-dialog-copy')));
+    await _tapBackupAction(tester, 'settings-backup-copy');
     await tester.pumpAndSettle();
 
     expect(clipboard.writes, hasLength(1));
@@ -120,9 +114,7 @@ void main() {
 
     await tester.pumpWidget(_app(storage: storage, clipboard: clipboard));
 
-    await tester.tap(find.byKey(const Key('settings-backup-card')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('backup-dialog-restore')));
+    await _tapBackupAction(tester, 'settings-backup-restore');
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('restore-confirm-dialog')), findsOneWidget);
@@ -154,9 +146,7 @@ void main() {
 
     await tester.pumpWidget(_app(storage: storage, clipboard: clipboard));
 
-    await tester.tap(find.byKey(const Key('settings-backup-card')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('backup-dialog-restore')));
+    await _tapBackupAction(tester, 'settings-backup-restore');
     await tester.pumpAndSettle();
 
     expect(find.text(_l10n.clipboardEmptyBackup), findsOneWidget);
@@ -164,7 +154,9 @@ void main() {
     expect(storage.writes, isEmpty);
   });
 
-  testWidgets('explains and confirms changing the default vehicle', (tester) async {
+  testWidgets('explains and confirms changing the default vehicle', (
+    tester,
+  ) async {
     final changed = <String>[];
     await tester.pumpWidget(
       _app(
@@ -187,19 +179,36 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('default-vehicle-option-v2')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('default-vehicle-confirm-dialog')), findsOneWidget);
-    expect(find.text(_l10n.defaultVehicleChangeMessage('2021 Honda Civic')), findsOneWidget);
+    expect(
+      find.byKey(const Key('default-vehicle-confirm-dialog')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(_l10n.defaultVehicleChangeMessage('2021 Honda Civic')),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const Key('default-vehicle-confirm-action')));
     await tester.pumpAndSettle();
     expect(changed, ['v2']);
   });
 
-  testWidgets('cancelling default vehicle change leaves it unchanged', (tester) async {
+  testWidgets('cancelling default vehicle change leaves it unchanged', (
+    tester,
+  ) async {
     final changed = <String>[];
     await tester.pumpWidget(
       _app(
         storage: _FakeStorage(jsonEncode(_collection().toJson())),
-        vehicles: [..._collection().vehicles, VehicleProfile(id: 'v2', year: 2021, make: 'Honda', model: 'Civic', garage: GarageSnapshot.seeded())],
+        vehicles: [
+          ..._collection().vehicles,
+          VehicleProfile(
+            id: 'v2',
+            year: 2021,
+            make: 'Honda',
+            model: 'Civic',
+            garage: GarageSnapshot.seeded(),
+          ),
+        ],
         defaultVehicleId: 'v1',
         onDefaultVehicleChanged: (id) async => changed.add(id),
       ),
@@ -216,12 +225,16 @@ void main() {
 }
 
 Future<void> _tapRestoreAndConfirm(WidgetTester tester) async {
-  await tester.tap(find.byKey(const Key('settings-backup-card')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const Key('backup-dialog-restore')));
+  await _tapBackupAction(tester, 'settings-backup-restore');
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('restore-confirm-action')));
   await tester.pumpAndSettle();
+}
+
+Future<void> _tapBackupAction(WidgetTester tester, String key) async {
+  final action = find.byKey(Key(key));
+  await tester.ensureVisible(action);
+  await tester.tap(action);
 }
 
 Widget _app({

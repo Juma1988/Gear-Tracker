@@ -5,10 +5,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'l10n/app_localizations.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
 import 'widgets/dev_overlay.dart';
 
-void main() => runApp(const RestartWidget(child: GearTrackerApp()));
+void main() =>
+    runApp(const RestartWidget(child: SplashScreen(child: GearTrackerApp())));
 
 const bool isDebug = kDebugMode;
 
@@ -65,20 +67,43 @@ class GearTrackerAppState extends State<GearTrackerApp> {
     final preferences = await SharedPreferences.getInstance();
     final languageCode = preferences.getString(_localePreferenceKey);
     if (!mounted || languageCode == null) return;
-    if (languageCode == 'en' || languageCode == 'ar') {
-      setState(() => _locale = Locale(languageCode));
+    if (languageCode == 'en') {
+      setState(() => _locale = const Locale('en'));
+    } else if (languageCode == 'ar-EG') {
+      setState(() => _locale = const Locale('ar', 'EG'));
+    } else if (languageCode == 'ar') {
+      setState(() => _locale = const Locale('ar'));
     }
   }
 
   Future<void> setLocale(Locale locale) async {
     if (locale.languageCode != 'en' && locale.languageCode != 'ar') return;
+    if (locale.languageCode == 'ar' &&
+        locale.countryCode != null &&
+        locale.countryCode != 'EG') {
+      return;
+    }
     setState(() => _locale = locale);
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_localePreferenceKey, locale.languageCode);
+    final value = locale.languageCode == 'ar' && locale.countryCode == 'EG'
+        ? 'ar-EG'
+        : locale.languageCode;
+    await preferences.setString(_localePreferenceKey, value);
   }
 
-  Future<void> toggleLocale() =>
-      setLocale(Locale((_locale?.languageCode ?? 'en') == 'ar' ? 'en' : 'ar'));
+  Future<void> toggleLocale() => setLocale(
+    (_locale?.languageCode ?? 'en') == 'ar'
+        ? const Locale('en')
+        : const Locale('ar'),
+  );
+
+  bool get isEgyptianArabic =>
+      _locale?.languageCode == 'ar' && _locale?.countryCode == 'EG';
+
+  Future<void> setEgyptianDialect(bool enabled) async {
+    if (_locale?.languageCode != 'ar') return;
+    await setLocale(enabled ? const Locale('ar', 'EG') : const Locale('ar'));
+  }
 
   Future<void> _loadThemePreference() async {
     final preferences = await SharedPreferences.getInstance();

@@ -4,6 +4,7 @@ import '../l10n/app_localizations.dart';
 import '../models/service_item.dart';
 import '../models/tire_item.dart';
 import '../theme/app_tokens.dart';
+import 'card_action_menu.dart';
 import 'service_card_content.dart';
 
 /// The content arrangement displayed by [ServiceHealthCard].
@@ -25,7 +26,8 @@ class ServiceHealthCard extends StatefulWidget {
   }) : layout = ServiceHealthCardLayout.service,
        tires = null,
        onEditTire = null,
-       compact = false;
+       compact = false,
+       hideAtNarrowLargeText = false;
 
   factory ServiceHealthCard.tireGrid({
     Key? key,
@@ -33,6 +35,7 @@ class ServiceHealthCard extends StatefulWidget {
     required int currentOdometer,
     required ValueChanged<TireItem> onEditTire,
     bool compact = false,
+    bool hideAtNarrowLargeText = false,
   }) {
     assert(_isValidTireSet(tires));
     return ServiceHealthCard._tireGrid(
@@ -41,6 +44,7 @@ class ServiceHealthCard extends StatefulWidget {
       currentOdometer: currentOdometer,
       onEditTire: onEditTire,
       compact: compact,
+      hideAtNarrowLargeText: hideAtNarrowLargeText,
     );
   }
 
@@ -50,6 +54,7 @@ class ServiceHealthCard extends StatefulWidget {
     required this.currentOdometer,
     required this.onEditTire,
     required this.compact,
+    required this.hideAtNarrowLargeText,
   }) : layout = ServiceHealthCardLayout.tireGrid,
        service = null,
        onEditService = null,
@@ -64,6 +69,7 @@ class ServiceHealthCard extends StatefulWidget {
   final VoidCallback? onDeleteService;
   final ValueChanged<TireItem>? onEditTire;
   final bool compact;
+  final bool hideAtNarrowLargeText;
   final DateTime? now;
 
   @override
@@ -106,6 +112,7 @@ class _ServiceHealthCardState extends State<ServiceHealthCard> {
       currentOdometer: widget.currentOdometer,
       onEditTire: widget.onEditTire!,
       compact: widget.compact,
+      hideAtNarrowLargeText: widget.hideAtNarrowLargeText,
     ),
   };
 }
@@ -226,7 +233,29 @@ class _ServiceCardState extends State<_ServiceCard> {
             hoverColor: color.withValues(alpha: .08),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
-              children: [Expanded(child: ExcludeSemantics(child: tapContent))],
+              children: [
+                Expanded(child: ExcludeSemantics(child: tapContent)),
+                if (widget.onDelete != null)
+                  CardActionMenu(
+                    key: Key('service-health-card-menu-${widget.service.id}'),
+                    tooltip: l10n.serviceMenuTooltip,
+                    actions: [
+                      CardActionMenuAction(
+                        value: 'edit',
+                        icon: Icons.edit_outlined,
+                        label: l10n.editServiceHint,
+                        onSelected: widget.onTap,
+                      ),
+                      CardActionMenuAction(
+                        value: 'delete',
+                        icon: Icons.delete_outline,
+                        label: l10n.deleteService,
+                        isDestructive: true,
+                        onSelected: widget.onDelete!,
+                      ),
+                    ],
+                  ),
+              ],
             ),
           ),
         ),
@@ -242,15 +271,22 @@ class _TireGridCard extends StatelessWidget {
     required this.currentOdometer,
     required this.onEditTire,
     required this.compact,
+    required this.hideAtNarrowLargeText,
   });
 
   final List<TireItem> tires;
   final int currentOdometer;
   final ValueChanged<TireItem> onEditTire;
   final bool compact;
+  final bool hideAtNarrowLargeText;
 
   @override
   Widget build(BuildContext context) {
+    if (hideAtNarrowLargeText &&
+        MediaQuery.sizeOf(context).width <= 400 &&
+        MediaQuery.textScalerOf(context).scale(1) > 1.5) {
+      return const SizedBox.shrink();
+    }
     final byPosition = {for (final tire in tires) tire.id: tire};
     final orderedTires = [
       for (final id in TireItem.positionIds) byPosition[id]!,
@@ -264,10 +300,9 @@ class _TireGridCard extends StatelessWidget {
 
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     return SizedBox(
-      height: (AppTokens.healthCardHeight + (textScale - 1) * 42).clamp(
-        AppTokens.healthCardHeight,
-        double.infinity,
-      ).toDouble(),
+      height: (AppTokens.healthCardHeight + (textScale - 1) * 42)
+          .clamp(AppTokens.healthCardHeight, double.infinity)
+          .toDouble(),
       child: Container(
         padding: const EdgeInsetsDirectional.all(10),
         decoration: BoxDecoration(
@@ -380,6 +415,7 @@ class _TireTile extends StatelessWidget {
     final status = l10n.status(serviceHealthStatusKey(metrics.status));
     final remainingPercent = numbers.formatDecimal(metrics.remainingPercent);
     final remainingKm = numbers.formatDecimal(metrics.remainingKm);
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.5;
 
     return Semantics(
       button: true,
@@ -442,8 +478,10 @@ class _TireTile extends StatelessWidget {
                           ),
                       ],
                     ),
-                    if (!compact) ...[
-                      const Spacer(),
+                    if (!compact &&
+                        !largeText &&
+                        MediaQuery.sizeOf(context).width > 400) ...[
+                      const SizedBox(height: 4),
                       HealthProgressBar(
                         label: l10n.tireProgressLabel(remainingPercent),
                         valueLabel: l10n.tireRemaining(

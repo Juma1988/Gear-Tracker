@@ -10,7 +10,7 @@ class ServicePickerCard extends StatelessWidget {
     required this.title,
     this.subtitle,
     required this.icon,
-    required this.onTap,
+    this.onTap,
     this.onLongPress,
     this.isSelected = false,
     this.trailing,
@@ -21,7 +21,7 @@ class ServicePickerCard extends StatelessWidget {
   final String title;
   final String? subtitle;
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final bool isSelected;
 
@@ -41,12 +41,12 @@ class ServicePickerCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return Semantics(
       button: true,
-      enabled: true,
+      enabled: onTap != null,
       selected: isSelected,
       container: true,
       explicitChildNodes: true,
       label: isSelected ? l10n.selectedLabel(title) : title,
-      hint: isSelected ? l10n.editServiceHint : l10n.openServiceDetailsHint,
+      hint: isSelected ? l10n.alreadySelectedHint : l10n.openServiceDetailsHint,
       onTap: onTap,
       child: Material(
         color: Colors.transparent,

@@ -8,6 +8,7 @@ import '../main.dart';
 import '../models/vehicle_profile.dart';
 import '../preferences/display_preferences.dart';
 import '../reminders/reminder_preferences.dart';
+import '../theme/app_tokens.dart';
 import '../widgets/dev_overlay.dart';
 import '../widgets/service_picker_card.dart';
 
@@ -109,49 +110,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _openBackupDialog() async {
+  Future<void> _openLanguageDialog() async {
+    final appState = GearTrackerApp.of(context);
+    if (appState == null) return;
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        key: const Key('backup-dialog'),
-        title: Text(AppLocalizations.of(dialogContext).backupAndRestore),
-        content: SingleChildScrollView(
-          child: Column(
+      builder: (dialogContext) {
+        final l10n = AppLocalizations.of(dialogContext);
+        final currentLanguage = appState.locale?.languageCode ?? 'en';
+        return AlertDialog(
+          key: const Key('language-dialog'),
+          title: Text(l10n.chooseLanguage),
+          content: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(AppLocalizations.of(dialogContext).localStorageTitle),
-              const SizedBox(height: 4),
-              Text(AppLocalizations.of(dialogContext).localStorageGuidance),
-              const SizedBox(height: 12),
-              Text(AppLocalizations.of(dialogContext).backupGuidance),
+              Text(l10n.languageSettingsHint),
+              const SizedBox(height: 8),
+              ListTile(
+                key: const Key('language-option-english'),
+                title: Text(l10n.languageEnglish),
+                trailing: currentLanguage == 'en'
+                    ? const Icon(Icons.check_circle)
+                    : const Icon(Icons.radio_button_unchecked),
+                onTap: () {
+                  appState.setLocale(const Locale('en'));
+                  Navigator.pop(dialogContext);
+                },
+              ),
+              ListTile(
+                key: const Key('language-option-arabic'),
+                title: Text(l10n.languageArabic),
+                trailing: currentLanguage == 'ar'
+                    ? const Icon(Icons.check_circle)
+                    : const Icon(Icons.radio_button_unchecked),
+                onTap: () {
+                  appState.setLocale(const Locale('ar'));
+                  Navigator.pop(dialogContext);
+                },
+              ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            key: const Key('backup-dialog-copy'),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _copyBackup();
-            },
-            child: Text(AppLocalizations.of(dialogContext).copyBackup),
-          ),
-          TextButton(
-            key: const Key('backup-dialog-restore'),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _restoreBackup();
-            },
-            child: Text(AppLocalizations.of(dialogContext).restoreBackup),
-          ),
-          FilledButton(
-            key: const Key('backup-dialog-close'),
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(AppLocalizations.of(dialogContext).closeAction),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -388,7 +388,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     Widget settingsGroup(String label, List<Widget> children) => Container(
       margin: EdgeInsets.zero,
-      padding: const EdgeInsetsDirectional.only(start: 10, end: 10, bottom: 6),
+      padding: const EdgeInsetsDirectional.only(start: 10, end: 10, bottom: 10),
       decoration: BoxDecoration(
         color: colors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
@@ -396,7 +396,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [sectionLabel(label), ...children],
+        children: [sectionLabel(label), const SizedBox(height: 8), ...children],
       ),
     );
 
@@ -404,7 +404,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(title: Text(l10n.settingsTitle), centerTitle: false),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           child: Column(
             children: [
               settingsGroup(l10n.appearanceSection, [
@@ -420,7 +420,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   compact: true,
                   onTap: () => appState?.toggleTheme(),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 12),
                 ServicePickerCard(
                   key: const Key('settings-compact-tire-health-card'),
                   title: l10n.compactTireHealthCard,
@@ -436,7 +436,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   compact: true,
                   onTap: _toggleCompactTireHealth,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 12),
                 ServicePickerCard(
                   key: const Key('settings-show-guidance-card'),
                   title: l10n.showGuidance,
@@ -452,6 +452,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   compact: true,
                   onTap: _toggleShowGuidance,
                 ),
+                const SizedBox(height: 12),
                 ServicePickerCard(
                   key: const Key('settings-language-card'),
                   title: l10n.language,
@@ -460,10 +461,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       : l10n.languageEnglish,
                   icon: Icons.language,
                   compact: true,
-                  onTap: () => appState?.toggleLocale(),
+                  onTap: _openLanguageDialog,
                 ),
+                if (appState?.locale?.languageCode == 'ar') ...[
+                  const SizedBox(height: 12),
+                  _SettingsSwitchTile(
+                    key: const Key('settings-egyptian-dialect-card'),
+                    title: l10n.egyptianDialect,
+                    subtitle: l10n.languageArabic,
+                    icon: Icons.record_voice_over_outlined,
+                    value: appState?.isEgyptianArabic ?? false,
+                    switchKey: const Key('settings-egyptian-dialect-switch'),
+                    onChanged: (value) => appState?.setEgyptianDialect(value),
+                  ),
+                ],
               ]),
-              const SizedBox(height: 2),
+              const SizedBox(height: 12),
               settingsGroup(l10n.garageSection, [
                 ServicePickerCard(
                   key: const Key('settings-default-vehicle-card'),
@@ -477,7 +490,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: _pickDefaultVehicle,
                 ),
               ]),
-              const SizedBox(height: 2),
+              const SizedBox(height: 12),
               settingsGroup(l10n.notificationsSection, [
                 ServicePickerCard(
                   key: const Key('settings-reminders-card'),
@@ -488,21 +501,133 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: _editReminders,
                 ),
               ]),
-              const SizedBox(height: 2),
+              const SizedBox(height: 12),
               settingsGroup(l10n.backupRestoreSection, [
-                ServicePickerCard(
+                _BackupActionsCard(
                   key: const Key('settings-backup-card'),
                   title: l10n.backupAndRestore,
-                  subtitle: l10n.backupGuidance,
+                  subtitle: l10n.backupPrivacySummary,
                   icon: Icons.save_alt_outlined,
-                  accentColor: colors.tertiary,
-                  compact: true,
-                  onTap: _openBackupDialog,
+                  onCopy: _copyBackup,
+                  onRestore: _restoreBackup,
                 ),
               ]),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SettingsSwitchTile extends StatelessWidget {
+  const _SettingsSwitchTile({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.value,
+    required this.switchKey,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool value;
+  final Key switchKey;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.surfaceContainer,
+      borderRadius: BorderRadius.circular(8),
+      child: SwitchListTile(
+        key: switchKey,
+        contentPadding: const EdgeInsetsDirectional.only(start: 8, end: 4),
+        secondary: Icon(icon, color: colors.primary),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        value: value,
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+class _BackupActionsCard extends StatelessWidget {
+  const _BackupActionsCard({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onCopy,
+    required this.onRestore,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onCopy;
+  final VoidCallback onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.tertiary.withValues(alpha: .35)),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: colors.tertiary),
+              const SizedBox(width: 12),
+              Expanded(child: Text(title, style: AppTokens.cardTitleStyle)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+              fontSize: 13,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            l10n.backupActionHint,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                key: const Key('settings-backup-copy'),
+                onPressed: onCopy,
+                icon: const Icon(Icons.copy_outlined),
+                label: Text(l10n.copyBackup),
+              ),
+              FilledButton.tonalIcon(
+                key: const Key('settings-backup-restore'),
+                onPressed: onRestore,
+                icon: const Icon(Icons.restore_outlined),
+                label: Text(l10n.restoreBackup),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -549,42 +674,64 @@ class _ReminderSettingsDialogState extends State<ReminderSettingsDialog> {
               onChanged: (value) =>
                   setState(() => _value = _value.copyWith(enabled: value)),
             ),
-            SwitchListTile(
-              key: const Key('reminders-repeat-switch'),
-              contentPadding: EdgeInsets.zero,
-              title: Text(l10n.repeatUntilComplete),
-              value: _value.repeatUntilComplete,
-              onChanged: _value.enabled
-                  ? (value) => setState(
-                      () =>
-                          _value = _value.copyWith(repeatUntilComplete: value),
-                    )
-                  : null,
-            ),
-            DropdownButtonFormField<int>(
-              key: const Key('reminders-weekday-selector'),
-              initialValue: _value.weekday,
-              decoration: InputDecoration(labelText: l10n.day),
-              items: [
-                for (var day = DateTime.monday; day <= DateTime.sunday; day++)
-                  DropdownMenuItem(
-                    value: day,
-                    child: Text(l10n.weekdayName(day)),
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 180),
+              opacity: _value.enabled ? 1 : .55,
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    key: const Key('reminders-repeat-switch'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(l10n.repeatUntilComplete),
+                    value: _value.repeatUntilComplete,
+                    onChanged: _value.enabled
+                        ? (value) => setState(
+                            () => _value = _value.copyWith(
+                              repeatUntilComplete: value,
+                            ),
+                          )
+                        : null,
                   ),
-              ],
-              onChanged: _value.enabled
-                  ? (day) =>
-                        setState(() => _value = _value.copyWith(weekday: day))
-                  : null,
-            ),
-            ListTile(
-              key: const Key('reminders-time-picker'),
-              contentPadding: EdgeInsets.zero,
-              title: Text(l10n.time),
-              trailing: Text(
-                _formatTimeOfDay(context, _value.hour, _value.minute),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int>(
+                    key: const Key('reminders-weekday-selector'),
+                    initialValue: _value.weekday,
+                    decoration: InputDecoration(labelText: l10n.day),
+                    items: [
+                      for (
+                        var day = DateTime.monday;
+                        day <= DateTime.sunday;
+                        day++
+                      )
+                        DropdownMenuItem(
+                          value: day,
+                          child: Text(l10n.weekdayName(day)),
+                        ),
+                    ],
+                    onChanged: _value.enabled
+                        ? (day) => setState(
+                            () => _value = _value.copyWith(weekday: day),
+                          )
+                        : null,
+                  ),
+                  ListTile(
+                    key: const Key('reminders-time-picker'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(l10n.time),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _formatTimeOfDay(context, _value.hour, _value.minute),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+                    onTap: _value.enabled ? _pickTime : null,
+                  ),
+                ],
               ),
-              onTap: _value.enabled ? _pickTime : null,
             ),
           ],
         ),

@@ -186,7 +186,13 @@ void main() {
       expect(find.text('9'), findsNothing);
       expect(find.text('days left'), findsNothing);
       expect(
-        find.text(_l10n.status(ServiceStatusKey.replaceSoon)),
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is RichText &&
+              widget.text.toPlainText().contains(
+                _l10n.status(ServiceStatusKey.replaceSoon).toUpperCase(),
+              ),
+        ),
         findsOneWidget,
       );
       expect(find.textContaining('9,000 km left'), findsOneWidget);
@@ -251,7 +257,13 @@ void main() {
       expect(find.text('Expired'), findsNothing);
       expect(find.textContaining('Due by'), findsNothing);
       expect(
-        find.text(_l10n.status(ServiceStatusKey.replaceNow)),
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is RichText &&
+              widget.text.toPlainText().contains(
+                _l10n.status(ServiceStatusKey.replaceNow).toUpperCase(),
+              ),
+        ),
         findsOneWidget,
       );
       expect(find.textContaining('9,000 km left'), findsOneWidget);

@@ -7,7 +7,6 @@ import '../widgets/card_action_menu.dart';
 import '../widgets/dev_overlay.dart';
 import '../widgets/gear_text_field.dart';
 import '../widgets/service_picker_card.dart';
-import 'edit_service_screen.dart';
 import 'service_form_screen.dart';
 
 /// High-level section a [ServicePreset] belongs to in the picker.
@@ -296,19 +295,6 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
     await _openForm(iconKey: selectedIcon.iconKey, icon: selectedIcon.icon);
   }
 
-  Future<void> _openExistingService(ServiceItem service) async {
-    final result = await Navigator.of(context).push<Object>(
-      MaterialPageRoute(
-        builder: (_) => EditServiceScreen(
-          service: service,
-          currentOdometer: widget.currentOdometer,
-        ),
-      ),
-    );
-    if (!mounted || result == null) return;
-    Navigator.of(context).pop(result);
-  }
-
   /// Finds the already-added service that matches a preset, if any.
   ServiceItem? _addedServiceFor(ServicePreset preset) {
     for (final service in widget.existingServices) {
@@ -370,11 +356,11 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
       isSelected: addedService != null,
       onTap: addedService == null
           ? () => _openForm(
-              presetName: preset.name,
+              presetName: servicePresetDisplayName(l10n, preset),
               iconKey: preset.iconKey,
               icon: preset.icon,
             )
-          : () => _openExistingService(addedService),
+          : null,
       onLongPress: addedService == null
           ? null
           : () => _removeAddedService(addedService),

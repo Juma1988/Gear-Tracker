@@ -9,21 +9,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('reminder payload opens the matching service on the active vehicle', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_app());
-    await tester.pumpAndSettle();
+  testWidgets(
+    'reminder payload opens the matching service on the active vehicle',
+    (tester) async {
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
 
-    _deliver(
-      tester,
-      jsonEncode({'vehicleId': 'vehicle', 'serviceId': 'oil'}),
-    );
-    await tester.pumpAndSettle();
+      _deliver(
+        tester,
+        jsonEncode({'vehicleId': 'vehicle', 'serviceId': 'oil'}),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byType(EditServiceScreen), findsOneWidget);
-    expect(find.text('Engine Oil'), findsOneWidget);
-  });
+      expect(find.byType(EditServiceScreen), findsOneWidget);
+      expect(find.text('Engine Oil'), findsOneWidget);
+    },
+  );
 
   testWidgets('reminder payload switches vehicle before opening the service', (
     tester,
@@ -32,43 +33,47 @@ void main() {
     await tester.pumpAndSettle();
 
     // Notification targets the *other* vehicle, which is not active yet.
-    _deliver(
-      tester,
-      jsonEncode({'vehicleId': 'other', 'serviceId': 'brakes'}),
-    );
+    _deliver(tester, jsonEncode({'vehicleId': 'other', 'serviceId': 'brakes'}));
     await tester.pumpAndSettle();
 
     expect(find.byType(EditServiceScreen), findsOneWidget);
     expect(find.text('Brake Pads'), findsOneWidget);
   });
 
-  testWidgets('cold-start reminder retains its vehicle until the garage loads', (
+  testWidgets(
+    'cold-start reminder retains its vehicle until the garage loads',
+    (tester) async {
+      await tester.pumpWidget(_app());
+
+      // Deliver before the asynchronous garage load completes.
+      _deliver(
+        tester,
+        jsonEncode({'vehicleId': 'other', 'serviceId': 'brakes'}),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EditServiceScreen), findsOneWidget);
+      expect(find.text('Brake Pads'), findsOneWidget);
+    },
+  );
+
+  testWidgets('unknown cold-start vehicle does not open a service', (
     tester,
   ) async {
     await tester.pumpWidget(_app());
 
-    // Deliver before the asynchronous garage load completes.
-    _deliver(
-      tester,
-      jsonEncode({'vehicleId': 'other', 'serviceId': 'brakes'}),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EditServiceScreen), findsOneWidget);
-    expect(find.text('Brake Pads'), findsOneWidget);
-  });
-
-  testWidgets('unknown cold-start vehicle does not open a service', (tester) async {
-    await tester.pumpWidget(_app());
-
-    _deliver(
-      tester,
-      jsonEncode({'vehicleId': 'missing', 'serviceId': 'oil'}),
-    );
+    _deliver(tester, jsonEncode({'vehicleId': 'missing', 'serviceId': 'oil'}));
     await tester.pumpAndSettle();
 
     expect(find.byType(EditServiceScreen), findsNothing);
-    expect(find.text('Engine Oil'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is RichText &&
+            widget.text.toPlainText().toLowerCase().contains('engine oil'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('malformed reminder payload does not disturb navigation', (
@@ -81,7 +86,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EditServiceScreen), findsNothing);
-    expect(find.text('Engine Oil'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is RichText &&
+            widget.text.toPlainText().toLowerCase().contains('engine oil'),
+      ),
+      findsOneWidget,
+    );
   });
 }
 
