@@ -41,25 +41,28 @@ final _demoServices = <ServiceItem>[
     id: 'demo-engine-oil',
     name: 'Engine Oil',
     note: 'Full synthetic 5W-30',
-    serviceOdometer: 118000,
+    serviceOdometer: 64850,
     intervalKm: 10000,
     iconKey: 'oil',
+    installDate: DateTime(2026, 4, 1),
   ),
   ServiceItem(
     id: 'demo-brake-pads',
     name: 'Brake Pads',
     note: 'Front axle inspection',
-    serviceOdometer: 112000,
+    serviceOdometer: 52000,
     intervalKm: 30000,
     iconKey: 'brake_pads',
+    installDate: DateTime(2025, 8, 14),
   ),
   ServiceItem(
     id: 'demo-air-filter',
     name: 'Air Filter',
     note: 'Inspect filter and intake housing',
-    serviceOdometer: 116000,
+    serviceOdometer: 68000,
     intervalKm: 20000,
     iconKey: 'air_filter',
+    installDate: DateTime(2026, 3, 1),
   ),
   ServiceItem(
     id: 'demo-battery',
@@ -73,7 +76,7 @@ final _demoServices = <ServiceItem>[
     id: 'demo-timing-belt',
     name: 'Timing Belt',
     note: 'Replace by distance or date',
-    serviceOdometer: 90000,
+    serviceOdometer: 40000,
     intervalKm: 60000,
     installDate: DateTime(2025, 1, 10),
     shelfLifeMonths: 24,
@@ -83,17 +86,19 @@ final _demoServices = <ServiceItem>[
     id: 'demo-oil-filter',
     name: 'Oil Filter',
     note: 'Replace with engine oil service',
-    serviceOdometer: 118000,
+    serviceOdometer: 70000,
     intervalKm: 10000,
     iconKey: 'oil_filter',
+    installDate: DateTime(2026, 5, 15),
   ),
   ServiceItem(
     id: 'demo-cabin-filter',
     name: 'Cabin Filter',
     note: 'Replace for clean cabin air',
-    serviceOdometer: 115000,
-    intervalKm: 20000,
+    serviceOdometer: 60000,
+    intervalKm: 15000,
     iconKey: 'cabin_filter',
+    installDate: DateTime(2025, 12, 5),
   ),
   ServiceItem(
     id: 'demo-brake-fluid',
@@ -107,73 +112,82 @@ final _demoServices = <ServiceItem>[
     id: 'demo-tire-rotation',
     name: 'Tire Rotation',
     note: 'Rotate and check alignment',
-    serviceOdometer: 114000,
+    serviceOdometer: 65000,
     intervalKm: 12000,
     iconKey: 'tires',
+    installDate: DateTime(2026, 1, 20),
   ),
   ServiceItem(
     id: 'demo-spark-plugs',
     name: 'Spark Plugs',
     note: 'Inspect gap and ignition performance',
-    serviceOdometer: 90000,
+    serviceOdometer: 45000,
     intervalKm: 40000,
     iconKey: 'spark_plugs',
+    installDate: DateTime(2025, 6, 10),
   ),
   ServiceItem(
     id: 'demo-coolant',
     name: 'Coolant',
     note: 'Check level, color, and freeze protection',
-    serviceOdometer: 100000,
+    serviceOdometer: 50000,
     intervalKm: 40000,
     iconKey: 'coolant',
+    installDate: DateTime(2025, 7, 1),
   ),
   ServiceItem(
     id: 'demo-transmission-fluid',
     name: 'Transmission Fluid',
     note: 'Inspect level and shift quality',
-    serviceOdometer: 90000,
+    serviceOdometer: 30000,
     intervalKm: 60000,
     iconKey: 'transmission_fluid',
+    installDate: DateTime(2024, 10, 12),
   ),
   ServiceItem(
     id: 'demo-power-steering',
     name: 'Power Steering Fluid',
     note: 'Inspect fluid level and leaks',
-    serviceOdometer: 105000,
+    serviceOdometer: 35000,
     intervalKm: 50000,
     iconKey: 'power_steering',
+    installDate: DateTime(2025, 2, 3),
   ),
   ServiceItem(
     id: 'demo-drive-belts',
     name: 'Drive Belts',
     note: 'Inspect tension, cracks, and wear',
-    serviceOdometer: 108000,
+    serviceOdometer: 40000,
     intervalKm: 50000,
     iconKey: 'drive_belts',
+    installDate: DateTime(2025, 5, 18),
   ),
   ServiceItem(
     id: 'demo-wipers',
     name: 'Wiper Blades',
     note: 'Replace when streaking or chattering',
-    serviceOdometer: 119000,
+    serviceOdometer: 65000,
     intervalKm: 15000,
     iconKey: 'wipers',
+    installDate: DateTime(2026, 2, 8),
   ),
   ServiceItem(
     id: 'demo-suspension',
     name: 'Suspension Inspection',
     note: 'Check shocks, mounts, and bushings',
-    serviceOdometer: 85000,
+    serviceOdometer: 25000,
     intervalKm: 60000,
     iconKey: 'suspension',
+    installDate: DateTime(2024, 12, 12),
   ),
   ServiceItem(
     id: 'demo-fuel-filter',
     name: 'Fuel Filter',
     note: 'Replace and inspect fuel lines',
-    serviceOdometer: 100000,
+    serviceOdometer: 30000,
     intervalKm: 50000,
     iconKey: 'fuel_filter',
+    installDate: DateTime(2025, 4, 9),
   ),
   ServiceItem(
     id: 'demo-ac-service',
@@ -195,9 +209,43 @@ final _demoServices = <ServiceItem>[
     id: 'demo-general-maintenance',
     name: 'General Maintenance',
     note: 'Seasonal inspection and fluid checks',
-    serviceOdometer: 117000,
+    serviceOdometer: 65000,
     intervalKm: 15000,
     iconKey: 'maintenance',
+    installDate: DateTime(2026, 2, 1),
+  ),
+];
+
+final _demoHistory = <ServiceHistoryEntry>[
+  ServiceHistoryEntry(
+    id: 'demo-engine-oil-history-1',
+    serviceId: 'demo-engine-oil',
+    serviceName: 'Engine Oil',
+    previousServiceOdometer: 34850,
+    completedOdometer: 44850,
+    newNote: 'Full synthetic 5W-30 and oil filter replaced.',
+    newIntervalKm: 10000,
+    completedAt: DateTime(2024, 8, 18),
+  ),
+  ServiceHistoryEntry(
+    id: 'demo-engine-oil-history-2',
+    serviceId: 'demo-engine-oil',
+    serviceName: 'Engine Oil',
+    previousServiceOdometer: 44850,
+    completedOdometer: 54850,
+    newNote: 'Oil level and filter checked during routine service.',
+    newIntervalKm: 10000,
+    completedAt: DateTime(2025, 4, 12),
+  ),
+  ServiceHistoryEntry(
+    id: 'demo-engine-oil-history-3',
+    serviceId: 'demo-engine-oil',
+    serviceName: 'Engine Oil',
+    previousServiceOdometer: 54850,
+    completedOdometer: 64850,
+    newNote: 'Full synthetic oil change completed at the scheduled interval.',
+    newIntervalKm: 10000,
+    completedAt: DateTime(2026, 4, 1),
   ),
 ];
 
@@ -234,6 +282,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   GarageCollection? _garageCollection;
   VehicleProfile? _vehicle;
   List<ServiceItem> _services = const [];
+  List<ServiceItem> _demoServicesVisible = List.of(_demoServices);
   List<TireItem> _tires = const [];
   List<ServiceHistoryEntry> _history = const [];
   DashboardLoadState _loadState = DashboardLoadState.loading;
@@ -249,7 +298,10 @@ class DashboardScreenState extends State<DashboardScreen> {
   AppLocalizations get _l10n => AppLocalizations.of(context);
 
   List<ServiceItem> get _servicesForDisplay =>
-      showServiceDemo ? _demoServices : _services;
+      showServiceDemo ? _demoServicesVisible : _services;
+
+  List<ServiceHistoryEntry> get _historyForDisplay =>
+      showServiceDemo ? _demoHistory : _history;
 
   @override
   void initState() {
@@ -526,7 +578,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                           },
                           saveStatusKey: DashboardScreen.saveStatusKey,
                         ),
-                        if (_tires.isEmpty && _services.isEmpty) ...[
+                        if (_tires.isEmpty && servicesForDisplay.isEmpty) ...[
                           const SizedBox(height: 12),
                           _EmptyVehicleRecordMessage(
                             title: l10n.emptyVehicleRecordsTitle,
@@ -898,7 +950,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     final odometer = int.parse(_displayedOdometer);
     final metrics = service.metricsAt(odometer);
     final status = service.statusAt(odometer);
-    final serviceHistory = _history
+    final serviceHistory = _historyForDisplay
         .where((entry) => entry.serviceId == service.id)
         .toList(growable: false);
     final lastServiced = serviceHistory.isEmpty
@@ -1027,16 +1079,31 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
     if (!mounted || action == null) return;
     if (demo) {
-      await Navigator.of(context).push<Object>(
+      final result = await Navigator.of(context).push<Object>(
         MaterialPageRoute(
           builder: (_) => EditServiceScreen(
             service: service,
             currentOdometer: int.parse(_displayedOdometer),
             allowDelete: true,
+            history: _historyForDisplay,
             openCompletionOnLaunch: action == 'service',
           ),
         ),
       );
+      if (!mounted || result == null) return;
+      if (result == ServiceEditResult.delete) {
+        setState(() {
+          _demoServicesVisible = _demoServicesVisible
+              .where((item) => item.id != service.id)
+              .toList(growable: false);
+        });
+      } else if (result is ServiceItem) {
+        setState(() {
+          _demoServicesVisible = _demoServicesVisible
+              .map((item) => item.id == result.id ? result : item)
+              .toList(growable: false);
+        });
+      }
       return;
     }
     await _editServiceDirect(service, openCompletion: action == 'service');
@@ -1052,7 +1119,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           service: service,
           currentOdometer: int.parse(_stagedOdometer),
           allowDelete: service.id != 'engine-oil',
-          history: _history,
+            history: _historyForDisplay,
           openCompletionOnLaunch: openCompletion,
         ),
       ),
