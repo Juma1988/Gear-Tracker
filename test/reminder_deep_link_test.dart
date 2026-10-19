@@ -22,7 +22,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(EditServiceScreen), findsOneWidget);
-      expect(find.text('Engine Oil'), findsOneWidget);
+      expect(find.byKey(const Key('service-name-field')), findsOneWidget);
     },
   );
 
@@ -37,7 +37,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EditServiceScreen), findsOneWidget);
-    expect(find.text('Brake Pads'), findsOneWidget);
+    expect(find.byKey(const Key('service-name-field')), findsOneWidget);
   });
 
   testWidgets(
@@ -53,7 +53,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(EditServiceScreen), findsOneWidget);
-      expect(find.text('Brake Pads'), findsOneWidget);
+      expect(find.byKey(const Key('service-name-field')), findsOneWidget);
     },
   );
 

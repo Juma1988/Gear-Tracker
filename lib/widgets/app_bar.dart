@@ -11,14 +11,12 @@ class AppBar extends StatefulWidget {
     this.vehicleName = '2022 Golf GTI',
     required this.onSettings,
     required this.onVehicle,
-    this.onAdd,
     this.status = ServiceStatus.excellent,
   });
 
   final String vehicleName;
   final VoidCallback onSettings;
   final VoidCallback onVehicle;
-  final VoidCallback? onAdd;
   final ServiceStatus status;
 
   @override
@@ -93,13 +91,6 @@ class _AppBarState extends State<AppBar> {
             ),
             const SizedBox(width: 8),
             _HeaderAction(
-              onPressed: widget.onAdd,
-              tooltip: l10n.addService,
-              icon: Icons.add,
-              emphasized: true,
-            ),
-            const SizedBox(width: 4),
-            _HeaderAction(
               onPressed: widget.onSettings,
               tooltip: l10n.settingsTitle,
               icon: Icons.settings_outlined,
@@ -115,13 +106,11 @@ class _HeaderAction extends StatelessWidget {
     required this.onPressed,
     required this.tooltip,
     required this.icon,
-    this.emphasized = false,
   });
 
   final VoidCallback? onPressed;
   final String tooltip;
   final IconData icon;
-  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
@@ -137,11 +126,6 @@ class _HeaderAction extends StatelessWidget {
           child: IconButton(
             onPressed: onPressed,
             tooltip: tooltip,
-            style: emphasized
-                ? IconButton.styleFrom(
-                    backgroundColor: colors.surfaceContainerHigh,
-                  )
-                : null,
             icon: Icon(icon, color: colors.onSurface),
           ),
         ),

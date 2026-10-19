@@ -5,8 +5,10 @@ import 'package:flutter/rendering.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/service_form_input.dart';
+import '../models/service_history_entry.dart';
 import '../models/service_item.dart';
 import '../preferences/display_preferences.dart';
+import '../theme/app_tokens.dart';
 import '../widgets/dev_overlay.dart';
 import '../widgets/date_input.dart';
 import '../widgets/tracking_mode_selector.dart';
@@ -14,6 +16,16 @@ import '../widgets/gear_text_field.dart';
 import '../widgets/time_preset_chip.dart';
 
 /// Collects editable details for a blank or preset-named service.
+class ServiceRecordResult {
+  const ServiceRecordResult({
+    required this.updatedService,
+    required this.historyEntry,
+  });
+
+  final ServiceItem updatedService;
+  final ServiceHistoryEntry historyEntry;
+}
+
 class ServiceFormScreen extends StatefulWidget {
   const ServiceFormScreen({
     super.key,
@@ -23,6 +35,8 @@ class ServiceFormScreen extends StatefulWidget {
     this.initialIcon,
     this.serviceType = ServiceType.type01,
     this.existingServiceNames = const [],
+    this.recordingService,
+    this.returnToDashboardOnBack = false,
   });
 
   final int currentOdometer;
@@ -31,6 +45,8 @@ class ServiceFormScreen extends StatefulWidget {
   final IconData? initialIcon;
   final ServiceType serviceType;
   final Iterable<String> existingServiceNames;
+  final ServiceItem? recordingService;
+  final bool returnToDashboardOnBack;
 
   @override
   State<ServiceFormScreen> createState() => _ServiceFormScreenState();
@@ -52,16 +68,35 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
   final _mileageGroupKey = GlobalKey();
   final _timeGroupKey = GlobalKey();
 
+  bool get _isRecordingService => widget.recordingService != null;
+  bool get _isPresetService =>
+      widget.initialServiceName != null &&
+      (!_isRecordingService || !widget.recordingService!.isCustomService);
+
   @override
   void initState() {
     super.initState();
     DevOverlay.currentFilePath = 'lib/screens/service_form_screen.dart';
-    _nameController = TextEditingController(text: widget.initialServiceName);
+    final recording = widget.recordingService;
+    _nameController = TextEditingController(
+      text: widget.initialServiceName ?? recording?.name,
+    );
+    _noteController.text = recording?.note ?? '';
+    _intervalController.text = recording?.intervalKm?.toString() ?? '';
+    _shelfLifeMonthsController.text =
+        recording?.shelfLifeMonths?.toString() ?? '';
     _installDate = DateTime.now();
-    _iconKey = widget.initialIconKey ?? 'maintenance';
     _installKmController = TextEditingController(
       text: widget.currentOdometer.toString(),
     );
+    if (recording != null) {
+      _trackingMode = recording.tracksMileage && recording.tracksTime
+          ? ServiceTrackingMode.mileageAndTime
+          : recording.tracksTime
+          ? ServiceTrackingMode.time
+          : ServiceTrackingMode.mileage;
+    }
+    _iconKey = widget.initialIconKey ?? recording?.iconKey ?? 'maintenance';
     _loadGuidancePreference();
   }
 
@@ -171,6 +206,59 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final l10n = AppLocalizations.of(context);
+    if (_isRecordingService) {
+      final original = widget.recordingService!;
+      final completedAt = DateTime(
+        _installDate.year,
+        _installDate.month,
+        _installDate.day,
+      );
+      final input = _input;
+      final updated = input
+          .toItem(
+            id: original.id,
+            iconKey: original.iconKey,
+            type: original.type,
+            isCustom: original.isCustomService,
+            units: original.units,
+          )
+          .copyWith(
+            // A recorded service always gets the actual completion date,
+            // including mileage-only services whose add form leaves it null.
+            installDate: completedAt,
+            units: original.type == ServiceType.type02
+                ? [
+                    for (final unit in original.units)
+                      ServiceUnit(
+                        position: unit.position,
+                        installOdometer: input.tracksMileage
+                            ? int.parse(input.installKm.trim())
+                            : unit.installOdometer,
+                      ),
+                  ]
+                : const [],
+          );
+      Navigator.of(context).pop(
+        ServiceRecordResult(
+          updatedService: updated,
+          historyEntry: ServiceHistoryEntry(
+            id: 'service-${_newServiceId()}',
+            serviceId: original.id,
+            serviceName: original.name,
+            previousServiceOdometer: original.serviceOdometer,
+            completedOdometer: input.tracksMileage
+                ? int.parse(input.installKm.trim())
+                : null,
+            newNote: input.trimmedNote,
+            newIntervalKm: input.tracksMileage
+                ? int.parse(input.intervalKm.trim())
+                : null,
+            completedAt: completedAt,
+          ),
+        ),
+      );
+      return;
+    }
     if (_isDuplicateName(_nameController.text)) {
       final addAnyway = await showDialog<bool>(
         context: context,
@@ -191,8 +279,13 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
       );
       if (addAnyway != true || !mounted) return;
     }
-    Navigator.of(context)
-        .pop(_input.toItem(id: _newServiceId(), iconKey: _iconKey));
+    Navigator.of(context).pop(
+      _input.toItem(
+        id: _newServiceId(),
+        iconKey: _iconKey,
+        isCustom: widget.initialServiceName == null,
+      ),
+    );
   }
 
   /// Raw form state handed to the pure [ServiceFormInput] rules.
@@ -227,13 +320,25 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return PopScope(
-      canPop: !_hasChanges,
+      canPop: !_hasChanges && !widget.returnToDashboardOnBack,
       onPopInvokedWithResult: (didPop, _) async {
-        if (didPop || !await _confirmDiscard() || !context.mounted) return;
-        Navigator.of(context).pop();
+        if (didPop) return;
+        if (_hasChanges && !await _confirmDiscard()) return;
+        if (!context.mounted) return;
+        if (widget.returnToDashboardOnBack) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        } else {
+          Navigator.of(context).pop();
+        }
       },
       child: Scaffold(
-        appBar: AppBar(title: Text(l10n.addService)),
+        appBar: AppBar(
+          title: Text(
+            _isRecordingService
+                ? l10n.markServiceServiced(widget.recordingService!.name)
+                : l10n.addService,
+          ),
+        ),
         body: SafeArea(
           child: Form(
             key: _formKey,
@@ -245,6 +350,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
               children: [
                 _FormSection(
                   title: l10n.serviceDetails,
+                  compact: true,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -268,46 +374,68 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                  child: Text(
-                                    l10n.selectedServiceIcon,
-                                    style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        widget.initialServiceName ??
+                                            l10n.customService,
+                                        style: AppTokens.cardTitleStyle
+                                            .copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface,
+                                            ),
+                                      ),
+                                      if (!_isPresetService) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          l10n.selectedServiceIcon,
+                                          style: AppTokens.bodyStyle.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                if (!_isPresetService)
+                                  TextButton.icon(
+                                    key: const Key(
+                                      'service-form-change-icon-button',
+                                    ),
+                                    onPressed: _changeIcon,
+                                    icon: const Icon(
+                                      Icons.edit_outlined,
+                                      color: Colors.red,
+                                    ),
+                                    label: Text(
+                                      l10n.changeIcon,
+                                      style: const TextStyle(color: Colors.red),
                                     ),
                                   ),
-                                ),
-                                TextButton.icon(
-                                  key: const Key(
-                                    'service-form-change-icon-button',
-                                  ),
-                                  onPressed: _changeIcon,
-                                  icon: const Icon(
-                                    Icons.edit_outlined,
-                                    color: Colors.red,
-                                  ),
-                                  label: Text(
-                                    l10n.changeIcon,
-                                    style: const TextStyle(color: Colors.red),
-                                  ),
-                                ),
                               ],
                             ),
-                            const SizedBox(height: 16),
-                            GearTextField(
-                              key: const Key('add-service-name-field'),
-                              controller: _nameController,
-                              onChanged: _markChanged,
-                              textCapitalization: TextCapitalization.words,
-                              decoration: InputDecoration(
-                                labelText: l10n.serviceName,
-                                border: const OutlineInputBorder(),
+                            if (!_isPresetService) ...[
+                              const SizedBox(height: 16),
+                              GearTextField(
+                                key: const Key('add-service-name-field'),
+                                controller: _nameController,
+                                onChanged: _markChanged,
+                                textCapitalization: TextCapitalization.words,
+                                decoration: InputDecoration(
+                                  labelText: l10n.serviceName,
+                                  border: const OutlineInputBorder(),
+                                ),
+                                validator: (value) =>
+                                    value == null || value.trim().isEmpty
+                                    ? l10n.enterServiceName
+                                    : null,
                               ),
-                              validator: (value) =>
-                                  value == null || value.trim().isEmpty
-                                  ? l10n.enterServiceName
-                                  : null,
-                            ),
+                            ],
                             const SizedBox(height: 8),
                             TextButton.icon(
                               key: const Key(
@@ -377,9 +505,11 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                             children: [
                               if (_tracksMileage)
                                 _InstallKmField(
-                                  fieldKey: const Key(
-                                    'add-service-install-km-field',
-                                  ),
+                                  fieldKey: _isRecordingService
+                                      ? const Key('service-completion-km-field')
+                                      : const Key(
+                                          'add-service-install-km-field',
+                                        ),
                                   controller: _installKmController,
                                   currentOdometer: widget.currentOdometer,
                                   label: l10n.installKm,
@@ -423,16 +553,20 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                                   _installDate = value;
                                   _hasChanges = true;
                                 }),
-                                label: l10n.installedOn,
-                                fieldKey: const Key(
-                                  'service-install-date-button',
-                                ),
-                                sheetKey: const Key(
-                                  'service-install-date-sheet',
-                                ),
-                                wheelKey: const Key(
-                                  'service-install-date-wheel',
-                                ),
+                                label: _isRecordingService
+                                    ? l10n.completedOn
+                                    : l10n.installedOn,
+                                fieldKey: _isRecordingService
+                                    ? const Key(
+                                        'service-completion-date-button',
+                                      )
+                                    : const Key('service-install-date-button'),
+                                sheetKey: _isRecordingService
+                                    ? const Key('service-completion-date-sheet')
+                                    : const Key('service-install-date-sheet'),
+                                wheelKey: _isRecordingService
+                                    ? const Key('service-completion-date-wheel')
+                                    : const Key('service-install-date-wheel'),
                                 cancelKey: const Key(
                                   'service-install-date-cancel',
                                 ),
@@ -529,14 +663,18 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
         bottomNavigationBar: SafeArea(
           minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: FilledButton.icon(
-            key: const Key('service-form-sticky-save-button'),
+            key: _isRecordingService
+                ? const Key('service-completion-confirm-button')
+                : const Key('service-form-sticky-save-button'),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             onPressed: _save,
             icon: const Icon(Icons.save_outlined),
-            label: Text(l10n.addService),
+            label: Text(
+              _isRecordingService ? l10n.confirmService : l10n.addService,
+            ),
           ),
         ),
       ),
@@ -578,10 +716,15 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
 }
 
 class _FormSection extends StatelessWidget {
-  const _FormSection({required this.title, required this.child});
+  const _FormSection({
+    required this.title,
+    required this.child,
+    this.compact = false,
+  });
 
   final String title;
   final Widget child;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -596,7 +739,7 @@ class _FormSection extends StatelessWidget {
         ),
       ),
       Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(compact ? 12 : 16),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainer,
           borderRadius: BorderRadius.circular(12),

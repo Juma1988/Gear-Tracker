@@ -5,6 +5,7 @@ import 'package:app/data/garage_repository.dart';
 import 'package:app/l10n/app_localizations.dart';
 import 'package:app/models/service_item.dart';
 import 'package:app/models/vehicle_profile.dart';
+import 'package:app/preferences/service_preferences.dart';
 import 'package:app/screens/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,6 +55,35 @@ void main() {
     expect(find.byKey(const Key('settings-backup-copy')), findsOneWidget);
     expect(find.byKey(const Key('settings-backup-restore')), findsOneWidget);
     expect(find.text(_l10n.backupPrivacySummary), findsOneWidget);
+  });
+
+  testWidgets('custom service shortcut defaults off and persists changes', (
+    tester,
+  ) async {
+    final storage = _FakeStorage(jsonEncode(_collection().toJson()));
+    var changedValue = true;
+    await tester.pumpWidget(
+      _app(
+        storage: storage,
+        onCustomServiceChanged: (value) {
+          changedValue = value;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final switchFinder = find.byKey(
+      const Key('settings-custom-service-switch'),
+    );
+    await tester.ensureVisible(switchFinder);
+    expect(tester.widget<Switch>(switchFinder).value, isFalse);
+    expect(await ServicePreferences.loadCustomService(), isFalse);
+
+    await tester.tap(switchFinder);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Switch>(switchFinder).value, isTrue);
+    expect(await ServicePreferences.loadCustomService(), isTrue);
+    expect(changedValue, isTrue);
   });
 
   test('localizes storage, plaintext, and restore guidance in Arabic', () {
@@ -244,11 +274,13 @@ Widget _app({
   List<VehicleProfile>? vehicles,
   String? defaultVehicleId,
   Future<void> Function(String)? onDefaultVehicleChanged,
+  ValueChanged<bool>? onCustomServiceChanged,
 }) => MaterialApp(
   home: SettingsScreen(
     vehicles: vehicles ?? const [],
     defaultVehicleId: defaultVehicleId,
     onDefaultVehicleChanged: onDefaultVehicleChanged,
+    onCustomServiceChanged: onCustomServiceChanged,
     repository: GarageRepository(storage: storage),
     clipboard: clipboard ?? _FakeClipboard(),
     onGarageRestored: onGarageRestored,

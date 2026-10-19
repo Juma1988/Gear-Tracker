@@ -340,17 +340,16 @@ class ServiceCardHeader extends StatelessWidget {
                         fontWeight: AppTokens.fontWeightBold,
                       ),
                     ),
+                  if (data.showsConditionLine)
+                    Text(
+                      data.detail,
+                      style: AppTokens.labelStyle.copyWith(
+                        color: data.color,
+                        fontWeight: AppTokens.fontWeightSemiBold,
+                      ),
+                    ),
                 ],
               ),
-              const SizedBox(height: 2),
-              if (data.showsConditionLine)
-                Text(
-                  data.detail,
-                  style: AppTokens.labelStyle.copyWith(
-                    color: data.color,
-                    fontWeight: AppTokens.fontWeightSemiBold,
-                  ),
-                ),
             ],
           ),
         ),

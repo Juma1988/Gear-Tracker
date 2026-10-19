@@ -10,22 +10,33 @@ import '../controllers/dashboard_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../models/service_item.dart';
 import '../models/service_history_entry.dart';
+import '../models/fuel_entry.dart';
 import '../models/tire_item.dart';
 import '../models/vehicle_profile.dart';
 import '../preferences/display_preferences.dart';
+import '../preferences/service_preferences.dart';
+import '../preferences/fuel_display_preferences.dart';
+import '../preferences/daily_odometer_preferences.dart';
+import '../widgets/daily_odometer_dialog.dart';
 import '../reminders/reminder_notification_service.dart';
 import '../reminders/reminder_preferences.dart';
 import '../widgets/app_bar.dart';
 import '../widgets/dev_overlay.dart';
+import '../widgets/fuel_consumption_chart.dart';
 
 import '../widgets/service_health_card.dart';
 import '../widgets/service_card_content.dart';
+import '../widgets/static_notch_bottom_bar.dart';
+import 'history_screen.dart';
+import 'fuel_screen.dart';
+import 'fuel_form_screen.dart';
 import 'add_service_screen.dart';
 import 'add_vehicle_screen.dart';
 import 'edit_service_screen.dart';
 import 'edit_tire_screen.dart';
 import 'tire_health_wizard_screen.dart';
 import 'settings_screen.dart';
+import 'service_form_screen.dart';
 import 'vehicle_selector_screen.dart';
 
 export '../controllers/dashboard_controller.dart'
@@ -251,6 +262,8 @@ final _demoHistory = <ServiceHistoryEntry>[
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
+    this.initialFuelSelected = false,
+    this.enableDailyOdometerPrompt = false,
     super.key,
     this.repository,
     this.odometerSaveDebounce = const Duration(seconds: 1),
@@ -258,6 +271,7 @@ class DashboardScreen extends StatefulWidget {
   });
 
   final GarageRepository? repository;
+  final bool enableDailyOdometerPrompt;
   final Duration odometerSaveDebounce;
   final ValueChanged<DashboardSaveState>? onSaveStateChanged;
 
@@ -266,9 +280,26 @@ class DashboardScreen extends StatefulWidget {
 
   @override
   State<DashboardScreen> createState() => DashboardScreenState();
+  final bool initialFuelSelected;
+}
+
+enum _ServiceSummaryGroup {
+  good,
+  warning,
+  critical;
+
+  bool includes(ServiceStatus status) => switch (this) {
+    good => status == ServiceStatus.excellent || status == ServiceStatus.good,
+    warning =>
+      status == ServiceStatus.warning || status == ServiceStatus.replaceSoon,
+    critical => status == ServiceStatus.replaceNow,
+  };
 }
 
 class DashboardScreenState extends State<DashboardScreen> {
+  bool _dailyPromptAttempted = false;
+  _ServiceSummaryGroup? _selectedSummary;
+  String? _summaryVehicleId;
   String _savedOdometer = '000000';
   String _displayedOdometer = '000000';
   String _stagedOdometer = '000000';
@@ -285,9 +316,16 @@ class DashboardScreenState extends State<DashboardScreen> {
   List<ServiceItem> _demoServicesVisible = List.of(_demoServices);
   List<TireItem> _tires = const [];
   List<ServiceHistoryEntry> _history = const [];
+  bool _fuelFormOpen = false;
+  bool _addChoiceOpen = false;
   DashboardLoadState _loadState = DashboardLoadState.loading;
   DashboardSaveState _saveState = DashboardSaveState.saved;
   bool _compactTireHealth = false;
+  bool _historySelected = false;
+  bool _fuelSelected = false;
+  bool _servicesSelected = false;
+  bool _customService = false;
+  FuelConsumptionUnit _fuelUnit = FuelConsumptionUnit.kmPerLiter;
 
   void _setSaveState(DashboardSaveState state) {
     if (!mounted) return;
@@ -306,6 +344,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _fuelSelected = widget.initialFuelSelected;
     _repository = widget.repository ?? GarageRepository();
     _controller = DashboardController(repository: _repository);
     _reminderService = ReminderNotificationService(
@@ -314,9 +353,17 @@ class DashboardScreenState extends State<DashboardScreen> {
     DevOverlay.currentFilePath = 'lib/screens/dashboard_screen.dart';
     _loadGarage();
     _loadDisplayPreferences();
+    _loadCustomServicePreference();
+  }
+
+  Future<void> _loadCustomServicePreference() async {
+    final value = await ServicePreferences.loadCustomService();
+    if (mounted) setState(() => _customService = value);
   }
 
   Future<void> _loadDisplayPreferences() async {
+    final unit = await FuelDisplayPreferences.load();
+    if (mounted) setState(() => _fuelUnit = unit);
     final value = await DisplayPreferences.loadCompactTireHealth();
     if (mounted) setState(() => _compactTireHealth = value);
   }
@@ -338,7 +385,84 @@ class DashboardScreenState extends State<DashboardScreen> {
     if (_loadState == DashboardLoadState.ready) {
       unawaited(_syncReminders());
       _openPendingReminderService();
+      if (widget.enableDailyOdometerPrompt && !_dailyPromptAttempted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+            unawaited(_showDailyOdometerPrompt());
+          }
+        });
+      }
     }
+  }
+
+  Future<void> _showDailyOdometerPrompt() async {
+    if (_dailyPromptAttempted || _vehicle == null) return;
+    _dailyPromptAttempted = true;
+    final vehicle = _vehicle!;
+    try {
+      if (!await DailyOdometerPreferences.claimToday()) return;
+    } catch (_) {
+      return; // A failed preference read must not block normal garage use.
+    }
+    if (!mounted ||
+        _vehicle?.id != vehicle.id ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => DailyOdometerDialog(
+        vehicles: List.unmodifiable(_garageCollection!.vehicles),
+        initialVehicleId: vehicle.id,
+        onSave: _saveDailyOdometer,
+      ),
+    );
+  }
+
+  Future<bool> _saveDailyOdometer(String vehicleId, String value) async {
+    final collection = _controller.collection;
+    if (!mounted || collection == null) return false;
+    final matches = collection.vehicles.where(
+      (vehicle) => vehicle.id == vehicleId,
+    );
+    if (matches.isEmpty) return false;
+    final vehicle = matches.first;
+    final reading = int.tryParse(value);
+    if (reading == null ||
+        reading < vehicle.garage.odometer ||
+        reading > 999999) {
+      return false;
+    }
+    final updated = vehicle.withOdometer(reading);
+    _setSaveState(DashboardSaveState.saving);
+    final saved = await _controller.saveCollection(
+      collection.copyWith(
+        selectedVehicleId: vehicleId,
+        vehicles: [
+          for (final item in collection.vehicles)
+            item.id == vehicleId ? updated : item,
+        ],
+      ),
+      expectedRevision: _repository.revision,
+    );
+    if (!mounted) return saved;
+    if (saved) {
+      setState(() {
+        _garageCollection = _controller.collection;
+        _vehicle = _controller.vehicle;
+        _savedOdometer = _controller.savedOdometer;
+        _displayedOdometer = _controller.displayedOdometer;
+        _stagedOdometer = _controller.stagedOdometer;
+        _services = _controller.services;
+        _tires = _controller.tires;
+        _history = _controller.history;
+        _odometerSaveRevision++;
+      });
+      unawaited(_syncReminders(forceReschedule: true));
+    }
+    _setSaveState(saved ? DashboardSaveState.saved : DashboardSaveState.failed);
+    return saved;
   }
 
   void _handleReminderResponse(String payload) {
@@ -453,6 +577,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     List<ServiceItem>? services,
     List<TireItem>? tires,
     List<ServiceHistoryEntry>? history,
+    List<FuelEntry>? fuelEntries,
     String? odometer,
   }) async {
     _setSaveState(DashboardSaveState.saving);
@@ -460,6 +585,7 @@ class DashboardScreenState extends State<DashboardScreen> {
       nextServices: services,
       nextTires: tires,
       nextHistory: history,
+      nextFuelEntries: fuelEntries,
       odometer: odometer,
     );
     if (ok) {
@@ -473,7 +599,11 @@ class DashboardScreenState extends State<DashboardScreen> {
         });
       }
       unawaited(
-        _syncReminders(services: services ?? _services, forceReschedule: true),
+        _syncReminders(
+          services: services ?? _services,
+          odometer: odometer == null ? null : int.parse(odometer),
+          forceReschedule: true,
+        ),
       );
       _setSaveState(DashboardSaveState.saved);
       return true;
@@ -537,7 +667,232 @@ class DashboardScreenState extends State<DashboardScreen> {
     final l10n = AppLocalizations.of(context);
     final servicesForDisplay = _servicesForDisplay;
     final usingDemoServices = showServiceDemo;
+    var goodServiceCount = 0;
+    var warningServiceCount = 0;
+    var criticalServiceCount = 0;
+    final currentOdometer = int.parse(_displayedOdometer);
+    final now = DateTime.now();
+    for (final service in servicesForDisplay) {
+      final status = service.statusAt(currentOdometer, now: now);
+      if (status == ServiceStatus.excellent || status == ServiceStatus.good) {
+        goodServiceCount++;
+      } else if (status == ServiceStatus.warning ||
+          status == ServiceStatus.replaceSoon) {
+        warningServiceCount++;
+      } else {
+        criticalServiceCount++;
+      }
+    }
+    final healthCards = DashboardHealthCard.ordered(
+      services: servicesForDisplay,
+      tires: _tires,
+      currentOdometer: currentOdometer,
+      now: now,
+    );
+    final automaticSummary = criticalServiceCount > 0
+        ? _ServiceSummaryGroup.critical
+        : null;
+    final selectedSummary = _summaryVehicleId == _vehicle?.id
+        ? _selectedSummary
+        : automaticSummary;
+    final selectedCards = healthCards
+        .where((card) => selectedSummary?.includes(card.status) ?? false)
+        .toList();
+    final navigationBar = StaticNotchBottomBar(
+      historySelected: _historySelected,
+      fuelSelected: _fuelSelected,
+      servicesSelected: _servicesSelected,
+      onHome: () => setState(() {
+        _historySelected = false;
+        _fuelSelected = false;
+        _servicesSelected = false;
+      }),
+      onHistory: () => setState(() {
+        _historySelected = true;
+        _fuelSelected = false;
+        _servicesSelected = false;
+      }),
+      onFuel: () => setState(() {
+        _historySelected = false;
+        _fuelSelected = true;
+        _servicesSelected = false;
+      }),
+      onServices: () => setState(() {
+        _historySelected = false;
+        _fuelSelected = false;
+        _servicesSelected = true;
+      }),
+    );
+    final addServiceButton = FloatingActionButton(
+      key: const Key('bottom-nav-add-service'),
+      heroTag: 'static-notch-add-service',
+      onPressed: _showAddChoice,
+      tooltip: l10n.isArabic ? 'إضافة وقود أو خدمة' : 'Add fuel or service',
+      shape: const CircleBorder(),
+      child: const Icon(Icons.add),
+    );
+    if (_historySelected) {
+      return HistoryScreen(
+        history: _historyForDisplay,
+        bottomNavigationBar: navigationBar,
+        floatingActionButton: addServiceButton,
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      );
+    }
+    if (_servicesSelected) {
+      final serviceCards = DashboardHealthCard.ordered(
+        services: servicesForDisplay,
+        tires: _tires,
+        currentOdometer: int.parse(_displayedOdometer),
+        now: DateTime.now(),
+      );
+      return Scaffold(
+        floatingActionButtonAnimator: FloatingActionButtonAnimator.noAnimation,
+        floatingActionButton: _loadState == DashboardLoadState.ready
+            ? addServiceButton
+            : null,
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        bottomNavigationBar: navigationBar,
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.servicesTab,
+                        key: const Key('services-page-title'),
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _openSettings,
+                      icon: const Icon(Icons.settings_outlined),
+                      tooltip: l10n.settingsTitle,
+                    ),
+                  ],
+                ),
+              ),
+              if (_vehicle != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Card(
+                    child: ListTile(
+                      key: const Key('services-vehicle'),
+                      leading: const Icon(Icons.directions_car_outlined),
+                      title: Text(_vehicle!.name),
+                      trailing: const Icon(Icons.expand_more),
+                      onTap: _openVehicleSelector,
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: _loadState != DashboardLoadState.ready
+                    ? Center(
+                        child: Text(
+                          _loadState == DashboardLoadState.loading
+                              ? l10n.loadingGarage
+                              : l10n.noServicesYet,
+                        ),
+                      )
+                    : serviceCards.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(l10n.noServicesYet),
+                              const SizedBox(height: 8),
+                              Text(
+                                l10n.noServicesMessage,
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              FilledButton.icon(
+                                onPressed: _addService,
+                                icon: const Icon(Icons.add),
+                                label: Text(l10n.addService),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                        itemCount: serviceCards.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          return switch (serviceCards[index]) {
+                            DashboardServiceHealthCard(:final service) =>
+                              ServiceHealthCard.service(
+                                service: service,
+                                currentOdometer: int.parse(_displayedOdometer),
+                                onEditService: () => _showServiceActionsDialog(
+                                  service,
+                                  demo: usingDemoServices,
+                                ),
+                                onDeleteService: usingDemoServices
+                                    ? () {}
+                                    : () => _deleteService(service),
+                              ),
+                            DashboardTireHealthCard() =>
+                              ServiceHealthCard.tireGrid(
+                                tires: _tires,
+                                currentOdometer: int.parse(_displayedOdometer),
+                                onEditTire: _editTire,
+                                compact: _compactTireHealth,
+                              ),
+                          };
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_fuelSelected) {
+      return FuelScreen(
+        consumptionUnit: _fuelUnit,
+        key: ValueKey('fuel-${_vehicle?.id}'),
+        vehicle: _vehicle,
+        loading: _loadState == DashboardLoadState.loading,
+        loadError: _loadState == DashboardLoadState.error,
+        onAdd: _addFuelEntry,
+        onEdit: (entry) => _openFuelForm(entry),
+        onDelete: _deleteFuelEntry,
+        onVehicle: _openVehicleSelector,
+        onSettings: _openSettings,
+        onRetry: _loadGarage,
+        onAddVehicle: _addVehicle,
+        floatingActionButton: _loadState != DashboardLoadState.ready
+            ? null
+            : FloatingActionButton(
+                key: const Key('bottom-nav-add-fuel'),
+                heroTag: 'static-notch-add-service',
+                shape: const CircleBorder(),
+                onPressed: _showAddChoice,
+                tooltip: l10n.isArabic
+                    ? 'إضافة وقود أو خدمة'
+                    : 'Add fuel or service',
+                child: const Icon(Icons.add),
+              ),
+        bottomNavigationBar: navigationBar,
+      );
+    }
     return Scaffold(
+      floatingActionButtonAnimator: FloatingActionButtonAnimator.noAnimation,
+      floatingActionButton: _loadState == DashboardLoadState.ready
+          ? addServiceButton
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: navigationBar,
       body: SafeArea(
         child: _loadState == DashboardLoadState.ready
             ? CustomScrollView(
@@ -547,7 +902,6 @@ class DashboardScreenState extends State<DashboardScreen> {
                       vehicleName: _vehicle?.name ?? '2022 Golf GTI',
                       onSettings: _openSettings,
                       onVehicle: _openVehicleSelector,
-                      onAdd: _addService,
                       status: _mostUrgentStatus(
                         int.parse(_displayedOdometer),
                         now: DateTime.now(),
@@ -578,6 +932,47 @@ class DashboardScreenState extends State<DashboardScreen> {
                           },
                           saveStatusKey: DashboardScreen.saveStatusKey,
                         ),
+                        const SizedBox(height: 12),
+                        _ServiceStatusStats(
+                          selected: selectedSummary,
+                          onSelected: (group) => setState(() {
+                            _selectedSummary = selectedSummary == group
+                                ? null
+                                : group;
+                            _summaryVehicleId = _vehicle?.id;
+                          }),
+                          key: const Key('service-stats'),
+                          goodCount: goodServiceCount,
+                          warningCount: warningServiceCount,
+                          criticalCount: criticalServiceCount,
+                          goodLabel: l10n.status(ServiceStatusKey.good),
+                          warningLabel: l10n.status(ServiceStatusKey.warning),
+                          criticalLabel: l10n.criticalStatusLabel,
+                        ),
+                        const SizedBox(height: 12),
+                        if (selectedSummary != null)
+                          Padding(
+                            key: Key('service-summary-${selectedSummary.name}'),
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(switch (selectedSummary) {
+                              _ServiceSummaryGroup.good => l10n.status(
+                                ServiceStatusKey.good,
+                              ),
+                              _ServiceSummaryGroup.warning => l10n.status(
+                                ServiceStatusKey.warning,
+                              ),
+                              _ServiceSummaryGroup.critical =>
+                                l10n.criticalStatusLabel,
+                            }, style: Theme.of(context).textTheme.titleMedium),
+                          ),
+                        if (selectedSummary != null && selectedCards.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Text(
+                              l10n.noServicesInStatus,
+                              key: const Key('service-summary-empty'),
+                            ),
+                          ),
                         if (_tires.isEmpty && servicesForDisplay.isEmpty) ...[
                           const SizedBox(height: 12),
                           _EmptyVehicleRecordMessage(
@@ -587,23 +982,9 @@ class DashboardScreenState extends State<DashboardScreen> {
                             onAdd: _addService,
                             semanticKey: const Key('empty-vehicle-records'),
                           ),
-                        ] else if (_tires.isEmpty) ...[
-                          const SizedBox(height: 12),
-                          _EmptyVehicleRecordMessage(
-                            title: l10n.tireHealth,
-                            message: l10n.tireHealthGuideMessage,
-                            actionLabel: l10n.addTireHealth,
-                            onAdd: _addTireHealth,
-                            semanticKey: const Key('empty-tire-health'),
-                          ),
                         ],
                         const SizedBox(height: 12),
-                        for (final card in DashboardHealthCard.ordered(
-                          services: servicesForDisplay,
-                          tires: _tires,
-                          currentOdometer: int.parse(_displayedOdometer),
-                          now: DateTime.now(),
-                        )) ...[
+                        for (final card in selectedCards) ...[
                           switch (card) {
                             DashboardServiceHealthCard(:final service) =>
                               ServiceHealthCard.service(
@@ -630,6 +1011,12 @@ class DashboardScreenState extends State<DashboardScreen> {
                           },
                           const SizedBox(height: 12),
                         ],
+                        FuelConsumptionChart(
+                          consumptionUnit: _fuelUnit,
+                          vehicleId: _vehicle!.id,
+                          vehicleName: _vehicle!.name,
+                          entries: _vehicle!.garage.fuelEntries,
+                        ),
                       ],
                     ),
                   ),
@@ -698,6 +1085,9 @@ class DashboardScreenState extends State<DashboardScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SettingsScreen(
+          onFuelUnitChanged: (unit) {
+            if (mounted) setState(() => _fuelUnit = unit);
+          },
           vehicles: _garageCollection?.vehicles ?? const [],
           defaultVehicleId: _garageCollection?.defaultVehicleId,
           repository: _repository,
@@ -707,6 +1097,8 @@ class DashboardScreenState extends State<DashboardScreen> {
               _syncReminders(forceReschedule: true),
           onCompactTireHealthChanged: (value) =>
               setState(() => _compactTireHealth = value),
+          onCustomServiceChanged: (value) =>
+              setState(() => _customService = value),
         ),
       ),
     );
@@ -828,13 +1220,118 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Future<void> _showAddChoice() async {
+    if (_addChoiceOpen || _loadState != DashboardLoadState.ready) return;
+    _addChoiceOpen = true;
+    try {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          key: const Key('add-choice-dialog'),
+          title: Text(
+            _l10n.isArabic
+                ? 'ماذا تريد أن تضيف؟'
+                : 'What would you like to add?',
+          ),
+          children: [
+            SimpleDialogOption(
+              key: const Key('add-choice-fuel'),
+              onPressed: () => Navigator.pop(dialogContext, 'fuel'),
+              child: ListTile(
+                leading: const Icon(Icons.local_gas_station_outlined),
+                title: Text(_l10n.addFuelEntry),
+              ),
+            ),
+            SimpleDialogOption(
+              key: const Key('add-choice-service'),
+              onPressed: () => Navigator.pop(dialogContext, 'service'),
+              child: ListTile(
+                leading: const Icon(Icons.build_outlined),
+                title: Text(_l10n.addService),
+              ),
+            ),
+            SimpleDialogOption(
+              key: const Key('add-choice-cancel'),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(_l10n.cancel),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (choice == 'fuel') {
+        await _addFuelEntry();
+      } else if (choice == 'service') {
+        await _addService();
+      }
+    } finally {
+      _addChoiceOpen = false;
+    }
+  }
+
+  Future<void> _addFuelEntry() async {
+    await _openFuelForm();
+  }
+
+  Future<void> _openFuelForm([FuelEntry? entry]) async {
+    final vehicle = _vehicle;
+    if (_fuelFormOpen ||
+        vehicle == null ||
+        _loadState != DashboardLoadState.ready) {
+      return;
+    }
+    _fuelFormOpen = true;
+    try {
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => FuelFormScreen(
+            vehicle: vehicle,
+            initial: entry,
+            onSave: _saveFuelEntry,
+          ),
+        ),
+      );
+    } finally {
+      _fuelFormOpen = false;
+      if (mounted) DevOverlay.currentFilePath = 'lib/screens/fuel_screen.dart';
+    }
+  }
+
+  Future<bool> _saveFuelEntry(FuelEntry entry, int usualGrade) async {
+    final ok = await _controller.saveFuel(entry, usualGrade: usualGrade);
+    if (ok && mounted) {
+      setState(() {
+        _garageCollection = _controller.collection;
+        _vehicle = _controller.vehicle;
+      });
+    }
+    return ok;
+  }
+
+  Future<bool> _deleteFuelEntry(FuelEntry entry) async {
+    final ok = await _controller.deleteFuel(entry.vehicleId, entry.id);
+    if (ok && mounted) {
+      setState(() {
+        _garageCollection = _controller.collection;
+        _vehicle = _controller.vehicle;
+      });
+    }
+    return ok;
+  }
+
   Future<void> _addService() async {
+    final customService = await ServicePreferences.loadCustomService();
+    if (!mounted) return;
+    if (_customService != customService) {
+      setState(() => _customService = customService);
+    }
     final result = await Navigator.of(context).push<Object>(
       MaterialPageRoute(
         builder: (_) => AddServiceScreen(
           currentOdometer: int.parse(_savedOdometer),
           existingServices: _services,
           hasTires: _tires.isNotEmpty,
+          openCustomServiceDirectly: !customService,
         ),
       ),
     );
@@ -950,6 +1447,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     final odometer = int.parse(_displayedOdometer);
     final metrics = service.metricsAt(odometer);
     final status = service.statusAt(odometer);
+    final emphasizeRecordAction = status.index >= ServiceStatus.warning.index;
     final serviceHistory = _historyForDisplay
         .where((entry) => entry.serviceId == service.id)
         .toList(growable: false);
@@ -1065,19 +1563,55 @@ class DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, 'edit'),
-            child: Text(l10n.editServiceHint),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(dialogContext, 'service'),
-            icon: const Icon(Icons.task_alt),
-            label: Text(l10n.serviceActionMarkServiced),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OutlinedButton.icon(
+                key: const Key('service-dialog-history-action'),
+                onPressed: () => Navigator.pop(dialogContext, 'history'),
+                icon: const Icon(Icons.history),
+                label: Text(l10n.viewServiceHistory),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('service-dialog-edit-action'),
+                onPressed: () => Navigator.pop(dialogContext, 'edit'),
+                icon: const Icon(Icons.edit_outlined),
+                label: Text(l10n.editServiceHint),
+              ),
+              const SizedBox(height: 8),
+              if (emphasizeRecordAction)
+                FilledButton.icon(
+                  key: const Key('service-dialog-record-action'),
+                  onPressed: () => Navigator.pop(dialogContext, 'service'),
+                  icon: const Icon(Icons.task_alt),
+                  label: Text(l10n.serviceActionMarkServiced),
+                )
+              else
+                OutlinedButton.icon(
+                  key: const Key('service-dialog-record-action'),
+                  onPressed: () => Navigator.pop(dialogContext, 'service'),
+                  icon: const Icon(Icons.task_alt),
+                  label: Text(l10n.serviceActionMarkServiced),
+                ),
+            ],
           ),
         ],
       ),
     );
     if (!mounted || action == null) return;
+    if (action == 'history') {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => HistoryScreen(
+            history: serviceHistory,
+            serviceId: service.id,
+            serviceName: service.name,
+          ),
+        ),
+      );
+      return;
+    }
     if (demo) {
       final result = await Navigator.of(context).push<Object>(
         MaterialPageRoute(
@@ -1113,13 +1647,38 @@ class DashboardScreenState extends State<DashboardScreen> {
     ServiceItem service, {
     bool openCompletion = false,
   }) async {
+    if (openCompletion) {
+      final result = await Navigator.of(context).push<Object>(
+        MaterialPageRoute(
+          builder: (_) => ServiceFormScreen(
+            currentOdometer: int.parse(_stagedOdometer),
+            initialServiceName: service.name,
+            initialIconKey: service.iconKey,
+            initialIcon: service.icon,
+            serviceType: service.type,
+            existingServiceNames: _services.map((item) => item.name),
+            recordingService: service,
+          ),
+        ),
+      );
+      if (!mounted || result == null) return;
+      if (result is ServiceRecordResult) {
+        await _saveServiceCompletion(
+          ServiceCompletionResult(
+            updatedService: result.updatedService,
+            historyEntry: result.historyEntry,
+          ),
+        );
+      }
+      return;
+    }
     final result = await Navigator.of(context).push<Object>(
       MaterialPageRoute(
         builder: (_) => EditServiceScreen(
           service: service,
           currentOdometer: int.parse(_stagedOdometer),
           allowDelete: service.id != 'engine-oil',
-            history: _historyForDisplay,
+          history: _historyForDisplay,
           openCompletionOnLaunch: openCompletion,
         ),
       ),
@@ -1339,6 +1898,187 @@ class DashboardScreenState extends State<DashboardScreen> {
     }
     _showMessage(AppLocalizations.of(context).tireSaved(updatedTire.code));
   }
+}
+
+class _ServiceStatusStats extends StatelessWidget {
+  const _ServiceStatusStats({
+    super.key,
+    required this.goodCount,
+    required this.warningCount,
+    required this.criticalCount,
+    required this.goodLabel,
+    required this.warningLabel,
+    required this.criticalLabel,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final int goodCount;
+  final int warningCount;
+  final int criticalCount;
+  final String goodLabel;
+  final String warningLabel;
+  final String criticalLabel;
+  final _ServiceSummaryGroup? selected;
+  final ValueChanged<_ServiceSummaryGroup> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: _ServiceStatusStatCard(
+            icon: Icons.check_circle_outline,
+            keyName: 'service-stat-good',
+            selected: selected == _ServiceSummaryGroup.good,
+            onTap: () => onSelected(_ServiceSummaryGroup.good),
+            countKey: 'service-stat-count-good',
+            label: goodLabel,
+            count: goodCount,
+            background: colors.primaryContainer,
+            foreground: colors.onPrimaryContainer,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _ServiceStatusStatCard(
+            icon: Icons.warning_amber_rounded,
+            keyName: 'service-stat-warning',
+            selected: selected == _ServiceSummaryGroup.warning,
+            onTap: () => onSelected(_ServiceSummaryGroup.warning),
+            countKey: 'service-stat-count-warning',
+            label: warningLabel,
+            count: warningCount,
+            background: colors.tertiaryContainer,
+            foreground: colors.onTertiaryContainer,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _ServiceStatusStatCard(
+            icon: Icons.error_outline,
+            keyName: 'service-stat-critical',
+            selected: selected == _ServiceSummaryGroup.critical,
+            onTap: () => onSelected(_ServiceSummaryGroup.critical),
+            countKey: 'service-stat-count-critical',
+            label: criticalLabel,
+            count: criticalCount,
+            background: colors.errorContainer,
+            foreground: colors.onErrorContainer,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ServiceStatusStatCard extends StatelessWidget {
+  const _ServiceStatusStatCard({
+    required this.icon,
+    required this.keyName,
+    required this.countKey,
+    required this.label,
+    required this.count,
+    required this.background,
+    required this.foreground,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String keyName;
+  final IconData icon;
+  final String countKey;
+  final String label;
+  final int count;
+  final Color background;
+  final Color foreground;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    selected: selected,
+    button: true,
+    label: '$label: $count',
+    child: Card(
+      key: Key(keyName),
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: selected
+            ? BorderSide(color: foreground, width: 1.5)
+            : BorderSide.none,
+      ),
+      color: background.withValues(alpha: count >= 1 ? 0.4 : 0.1),
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(
+          children: [
+            PositionedDirectional(
+              start: 0,
+              top: 0,
+              bottom: 0,
+              child: ColoredBox(
+                key: Key('$keyName-rail'),
+                color: foreground,
+                child: const SizedBox(width: 3),
+              ),
+            ),
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: 60,
+                minWidth: double.infinity,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            label,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: foreground,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        ExcludeSemantics(
+                          child: Icon(icon, size: 14, color: foreground),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$count',
+                      key: Key(countKey),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: foreground,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _DashboardStateMessage extends StatelessWidget {

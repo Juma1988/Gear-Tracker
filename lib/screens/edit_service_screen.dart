@@ -58,6 +58,8 @@ class _EditServiceScreenState extends State<EditServiceScreen> {
   bool _showGuidance = true;
   bool _hasChanges = false;
 
+  bool get _isCustomService => widget.service.isCustomService;
+
   @override
   void initState() {
     super.initState();
@@ -284,70 +286,21 @@ class _EditServiceScreenState extends State<EditServiceScreen> {
                             ),
                           ),
                         const SizedBox(height: 8),
-                        OutlinedButton(
-                          key: const Key('service-completion-date-button'),
-                          onPressed: () async {
-                            final picked = await showModalBottomSheet<DateTime>(
-                              context: context,
-                              builder: (dateContext) => SafeArea(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(
-                                      height: 150,
-                                      child: ListWheelScrollView.useDelegate(
-                                        key: const Key(
-                                          'service-completion-date-wheel',
-                                        ),
-                                        itemExtent: 44,
-                                        onSelectedItemChanged: (index) =>
-                                            setSheetState(
-                                              () => completedAt = DateTime.now()
-                                                  .add(
-                                                    Duration(days: index - 15),
-                                                  ),
-                                            ),
-                                        childDelegate:
-                                            ListWheelChildBuilderDelegate(
-                                              childCount: 31,
-                                              builder: (_, index) => Center(
-                                                child: Text(
-                                                  DateTime.now()
-                                                      .add(
-                                                        Duration(
-                                                          days: index - 15,
-                                                        ),
-                                                      )
-                                                      .toLocal()
-                                                      .toString()
-                                                      .split(' ')
-                                                      .first,
-                                                ),
-                                              ),
-                                            ),
-                                      ),
-                                    ),
-                                    TextButton(
-                                      key: const Key(
-                                        'service-completion-date-done',
-                                      ),
-                                      onPressed: () => Navigator.pop(
-                                        dateContext,
-                                        completedAt,
-                                      ),
-                                      child: Text(l10n.done),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                            if (picked != null) {
-                              setSheetState(() => completedAt = picked);
-                            }
-                          },
-                          child: Text(
-                            '${l10n.completedOn}: ${completedAt.toLocal().toString().split(' ').first}',
+                        DateInput(
+                          value: completedAt,
+                          onChanged: (value) =>
+                              setSheetState(() => completedAt = value),
+                          label: l10n.completedOn,
+                          firstDate: DateTime.now().subtract(
+                            const Duration(days: 15),
                           ),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 15),
+                          ),
+                          fieldKey: const Key('service-completion-date-button'),
+                          sheetKey: const Key('service-completion-date-sheet'),
+                          wheelKey: const Key('service-completion-date-wheel'),
+                          doneKey: const Key('service-completion-date-done'),
                         ),
                         const SizedBox(height: 12),
                         FilledButton(
@@ -423,10 +376,6 @@ class _EditServiceScreenState extends State<EditServiceScreen> {
       ),
     );
     if (result != null && mounted) Navigator.pop(context, result);
-  }
-
-  Future<void> _markServiced() async {
-    await _openCompletionForm();
   }
 
   Future<void> _delete() async {
@@ -530,28 +479,30 @@ class _EditServiceScreenState extends State<EditServiceScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              l10n.serviceDetails,
+                              widget.service.name,
                               style: AppTokens.sectionTitleStyle,
                             ),
                           ),
-                          TextButton.icon(
-                            key: const Key('edit-service-change-icon-button'),
-                            onPressed: _changeIcon,
-                            icon: const Icon(
-                              Icons.edit_outlined,
-                              color: Colors.red,
+                          if (_isCustomService)
+                            TextButton.icon(
+                              key: const Key('edit-service-change-icon-button'),
+                              onPressed: _changeIcon,
+                              icon: const Icon(
+                                Icons.edit_outlined,
+                                color: Colors.red,
+                              ),
+                              label: Text(
+                                l10n.changeIcon,
+                                style: const TextStyle(color: Colors.red),
+                              ),
                             ),
-                            label: Text(
-                              l10n.changeIcon,
-                              style: const TextStyle(color: Colors.red),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
                       GearTextField(
                         key: const Key('service-name-field'),
                         controller: _nameController,
+                        readOnly: !_isCustomService,
                         onChanged: _markChanged,
                         textCapitalization: TextCapitalization.words,
                         decoration: InputDecoration(
@@ -754,13 +705,6 @@ class _EditServiceScreenState extends State<EditServiceScreen> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  key: const Key('mark-service-button'),
-                  onPressed: _markServiced,
-                  icon: const Icon(Icons.check_circle_outline),
-                  label: Text(l10n.markServiceServiced(widget.service.name)),
-                ),
               ],
             ),
           ),

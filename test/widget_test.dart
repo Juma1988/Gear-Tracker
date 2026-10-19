@@ -38,12 +38,18 @@ void main() {
     await tester.pumpWidget(const GearTrackerApp());
     await tester.pump();
     await tester.pump();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bottom-nav-home')));
+    await tester.pumpAndSettle();
 
     expect(find.text('GEAR TRACKER'), findsOneWidget);
     expect(find.text(_l10n.liveOdometerReading), findsOneWidget);
-    expect(find.textContaining('Engine Oil', findRichText: true), findsOneWidget);
+    expect(
+      find.textContaining('Engine Oil', findRichText: true),
+      findsOneWidget,
+    );
     expect(find.text('74850'), findsNothing);
-    expect(find.text('Services'), findsNothing);
+    expect(find.byKey(const Key('bottom-nav-services')), findsOneWidget);
   });
 
   testWidgets('loads an explicitly persisted maximum odometer value', (
@@ -76,18 +82,20 @@ void main() {
     expect(garage['odometer'], 999999);
   });
 
-  testWidgets('does not expose History from the dashboard header', (
+  testWidgets('exposes History in the bottom bar, not the dashboard header', (
     tester,
   ) async {
     await tester.pumpWidget(const GearTrackerApp());
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('Service history'), findsNothing);
-    expect(find.byIcon(Icons.history_outlined), findsNothing);
+    expect(find.byKey(const Key('bottom-nav-history')), findsOneWidget);
   });
 
   testWidgets('pushes Settings from the dashboard header', (tester) async {
     await tester.pumpWidget(const GearTrackerApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bottom-nav-home')));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip(_l10n.settingsTitle));
@@ -242,14 +250,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      tester.getSize(find.byType(ServiceHealthCard)).height,
-      167,
-    );
+    expect(tester.getSize(find.byType(ServiceHealthCard)).height, 165);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('header actions have 48dp hit targets at narrow width', (
+  testWidgets('settings header action has a 48dp hit target at narrow width', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -264,9 +269,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    for (final tooltip in [_l10n.addService, _l10n.settingsTitle]) {
-      expect(tester.getSize(find.byTooltip(tooltip)), const Size(48, 48));
-    }
+    expect(
+      tester.getSize(find.byTooltip(_l10n.settingsTitle)),
+      const Size(48, 48),
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -329,13 +335,25 @@ void main() {
 
     await tester.pumpWidget(card(83850));
     expect(find.text('Soon — 90% exhausted'), findsOneWidget);
-    expect(find.textContaining('REPLACE SOON', findRichText: true), findsOneWidget);
-    expect(find.textContaining('REPLACE NOW', findRichText: true), findsNothing);
+    expect(
+      find.textContaining('REPLACE SOON', findRichText: true),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('REPLACE NOW', findRichText: true),
+      findsNothing,
+    );
 
     await tester.pumpWidget(card(84850));
     expect(find.text('Critical — 100% exhausted'), findsOneWidget);
-    expect(find.textContaining('REPLACE NOW', findRichText: true), findsOneWidget);
-    expect(find.textContaining('REPLACE SOON', findRichText: true), findsNothing);
+    expect(
+      find.textContaining('REPLACE NOW', findRichText: true),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('REPLACE SOON', findRichText: true),
+      findsNothing,
+    );
     expect(find.text('0% · 0 km left'), findsOneWidget);
   });
 
@@ -455,7 +473,10 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.textContaining('REPLACE NOW', findRichText: true), findsNothing);
+      expect(
+        find.textContaining('REPLACE NOW', findRichText: true),
+        findsNothing,
+      );
       final header = tester.widget<gear_app_bar.AppBar>(
         find.byType(gear_app_bar.AppBar),
       );
@@ -463,7 +484,10 @@ void main() {
 
       await tester.pump(const Duration(seconds: 2));
 
-      expect(find.textContaining('REPLACE NOW', findRichText: true), findsOneWidget);
+      expect(
+        find.textContaining('REPLACE NOW', findRichText: true),
+        findsOneWidget,
+      );
       final confirmedHeader = tester.widget<gear_app_bar.AppBar>(
         find.byType(gear_app_bar.AppBar),
       );
@@ -596,15 +620,10 @@ void main() {
         const Key('service-health-card-content-engine-oil'),
       );
       await tester.ensureVisible(serviceCard);
-      await tester.tap(
-        find.byKey(const Key('service-health-card-engine-oil')),
-      );
+      await tester.tap(find.byKey(const Key('service-health-card-engine-oil')));
       await tester.pumpAndSettle();
-       expect(find.bySemanticsLabel(RegExp('Current odometer')), findsOneWidget);
-      expect(
-         find.text(_l10n.markServiced, skipOffstage: false),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel(RegExp('Current odometer')), findsOneWidget);
+      expect(find.text(_l10n.markServiced, skipOffstage: false), findsNothing);
       semantics.dispose();
     },
   );
@@ -632,13 +651,11 @@ void main() {
         const Key('service-health-card-content-engine-oil'),
       );
       await tester.ensureVisible(serviceCard);
-      await tester.tap(
-        find.byKey(const Key('service-health-card-engine-oil')),
-      );
+      await tester.tap(find.byKey(const Key('service-health-card-engine-oil')));
       await tester.pumpAndSettle();
       expect(
-         find.text('تسجيل إتمام الصيانة', skipOffstage: false),
-        findsOneWidget,
+        find.text('تسجيل إتمام الصيانة', skipOffstage: false),
+        findsNothing,
       );
     },
   );
@@ -669,7 +686,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('تحذير', findRichText: true), findsNWidgets(2));
-    expect(find.textContaining('75٪ مستهلك', findRichText: true), findsOneWidget);
+    expect(
+      find.textContaining('75٪ مستهلك', findRichText: true),
+      findsOneWidget,
+    );
     final localizations = MaterialLocalizations.of(
       tester.element(find.byType(ServiceHealthCard)),
     );
@@ -708,10 +728,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-       expect(find.textContaining('WARNING', findRichText: true), findsOneWidget);
-      await tester.tap(
-        find.byKey(const Key('service-health-card-engine-oil')),
+      expect(
+        find.textContaining('WARNING', findRichText: true),
+        findsOneWidget,
       );
+      await tester.tap(find.byKey(const Key('service-health-card-engine-oil')));
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       expect(taps, 1);
     },
@@ -817,6 +838,7 @@ void main() {
       serviceOdometer: 74850,
       intervalKm: 10000,
       iconKey: 'oil',
+      isCustom: true,
     );
     ServiceItem? savedService;
 
@@ -1011,12 +1033,13 @@ void main() {
       find.byKey(const Key('service-health-card-content-engine-oil')),
       findsOneWidget,
     );
-    expect(find.textContaining('Engine Oil', findRichText: true), findsOneWidget);
+    expect(
+      find.textContaining('Engine Oil', findRichText: true),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('tire-tile-front-left')), findsNothing);
 
-    await tester.tap(
-      find.byKey(const Key('service-health-card-engine-oil')),
-    );
+    await tester.tap(find.byKey(const Key('service-health-card-engine-oil')));
     expect(taps, 1);
   });
 

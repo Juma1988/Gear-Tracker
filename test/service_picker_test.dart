@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:app/widgets/gear_text_field.dart';
+
 const _l10n = AppLocalizations(Locale('en'));
 
 Future<void> _showOptionalServiceDetails(WidgetTester tester) async {
-  final toggle = find.byKey(
-    const Key('service-form-optional-details-toggle'),
-  );
+  final toggle = find.byKey(const Key('service-form-optional-details-toggle'));
   await _scrollFormIntoView(tester, toggle);
   await tester.tap(toggle);
   await tester.pumpAndSettle();
@@ -19,13 +19,13 @@ Future<void> _showOptionalServiceDetails(WidgetTester tester) async {
 void main() {
   test('provides the approved service presets in their display order', () {
     expect(servicePresetNames, const [
-       'Engine oil',
-       'Oil filter',
+      'Engine oil',
+      'Oil filter',
       'Air filter',
       'Cabin filter',
       'Brake pads',
       'Brake fluid',
-       'Tire rotation and alignment',
+      'Tire rotation and alignment',
       'Battery',
       'Spark plugs',
       'Coolant',
@@ -58,24 +58,47 @@ void main() {
     },
   );
 
-  testWidgets('opens the creation form with the selected preset name', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_testApp(const AddServiceScreen()));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'direct custom entry skips the preset list and opens icon choice',
+    (tester) async {
+      await tester.pumpWidget(
+        _testApp(const AddServiceScreen(openCustomServiceDirectly: true)),
+      );
+      await tester.pumpAndSettle();
 
-    await _scrollCardIntoView(
-      tester,
-      find.byKey(const Key('service-preset-tires')),
-    );
-    await tester.tap(find.byKey(const Key('service-preset-tires')));
-    await tester.pumpAndSettle();
+      expect(find.text(_l10n.chooseIcon), findsOneWidget);
+      expect(
+        find.byKey(const Key('start-custom-service-button')),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const Key('custom-service-icon-auto')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('add-service-name-field')), findsOneWidget);
+    },
+  );
 
-    final field = tester.widget<TextFormField>(
-      find.byKey(const Key('add-service-name-field')),
-    );
-     expect(field.controller!.text, 'Tire rotation and alignment');
-  });
+  testWidgets(
+    'preset shows its selected service name instead of a name field',
+    (tester) async {
+      await tester.pumpWidget(_testApp(const AddServiceScreen()));
+      await tester.pumpAndSettle();
+
+      await _scrollCardIntoView(
+        tester,
+        find.byKey(const Key('service-preset-tires')),
+      );
+      await tester.tap(find.byKey(const Key('service-preset-tires')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tire rotation and alignment'), findsOneWidget);
+      expect(find.text(_l10n.selectedServiceIcon), findsNothing);
+      expect(find.byKey(const Key('add-service-name-field')), findsNothing);
+      expect(
+        find.byKey(const Key('service-form-change-icon-button')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('uses the shared install date picker after selecting a service', (
     tester,
@@ -130,6 +153,27 @@ void main() {
     );
   });
 
+  testWidgets('Custom Service keeps its name editable', (tester) async {
+    await tester.pumpWidget(_testApp(const AddServiceScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('start-custom-service-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('custom-service-icon-maintenance')));
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<GearTextField>(
+      find.byKey(const Key('add-service-name-field')),
+    );
+    expect(field.readOnly, isFalse);
+    expect(find.text(_l10n.customService), findsOneWidget);
+    expect(find.text(_l10n.selectedServiceIcon), findsOneWidget);
+    expect(
+      find.byKey(const Key('service-form-change-icon-button')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('hides added preset icons but leaves custom names available', (
     tester,
   ) async {
@@ -159,7 +203,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-     expect(find.byKey(const Key('service-preset-oil_filter')), findsOneWidget);
+    expect(find.byKey(const Key('service-preset-oil_filter')), findsOneWidget);
     expect(find.byKey(const Key('service-preset-air_filter')), findsOneWidget);
   });
 
@@ -272,66 +316,65 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Battery starts distance-only with its selected icon',
-    (tester) async {
-      ServiceItem? createdService;
-      await tester.pumpWidget(
-        _testApp(
-          Builder(
-            builder: (context) => Scaffold(
-              body: Center(
-                child: FilledButton(
-                  onPressed: () async {
-                    createdService = await Navigator.of(context)
-                        .push<ServiceItem>(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const AddServiceScreen(currentOdometer: 74850),
-                          ),
-                        );
-                  },
-                  child: const Text('Open custom picker'),
-                ),
+  testWidgets('Battery starts distance-only with its selected icon', (
+    tester,
+  ) async {
+    ServiceItem? createdService;
+    await tester.pumpWidget(
+      _testApp(
+        Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () async {
+                  createdService = await Navigator.of(context)
+                      .push<ServiceItem>(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const AddServiceScreen(currentOdometer: 74850),
+                        ),
+                      );
+                },
+                child: const Text('Open custom picker'),
               ),
             ),
           ),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Open custom picker'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('start-custom-service-button')));
-      await tester.pumpAndSettle();
-      final batteryIcon = find.byKey(const Key('custom-service-icon-battery'));
-      await _scrollCardIntoView(tester, batteryIcon);
-      await tester.tap(batteryIcon);
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Open custom picker'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('start-custom-service-button')));
+    await tester.pumpAndSettle();
+    final batteryIcon = find.byKey(const Key('custom-service-icon-battery'));
+    await _scrollCardIntoView(tester, batteryIcon);
+    await tester.tap(batteryIcon);
+    await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.battery_full), findsOneWidget);
-      await tester.enterText(
-        find.byKey(const Key('add-service-name-field')),
-        'Battery inspection',
-      );
-      await tester.enterText(
-        find.byKey(const Key('add-service-interval-field')),
-        '1000',
-      );
-      await _showOptionalServiceDetails(tester);
-      await tester.enterText(
-        find.byKey(const Key('add-service-note-field')),
-        'Terminal check',
-      );
-      await _tapFormSave(tester);
+    expect(find.byIcon(Icons.battery_full), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('add-service-name-field')),
+      'Battery inspection',
+    );
+    await tester.enterText(
+      find.byKey(const Key('add-service-interval-field')),
+      '1000',
+    );
+    await _showOptionalServiceDetails(tester);
+    await tester.enterText(
+      find.byKey(const Key('add-service-note-field')),
+      'Terminal check',
+    );
+    await _tapFormSave(tester);
 
-      expect(createdService?.type, ServiceType.type01);
-      expect(createdService?.iconKey, 'battery');
-      expect(createdService?.icon, Icons.battery_full);
-      expect(createdService?.tracksMileage, isTrue);
-      expect(createdService?.shelfLifeMonths, isNull);
-    },
-  );
+    expect(createdService?.type, ServiceType.type01);
+    expect(createdService?.iconKey, 'battery');
+    expect(createdService?.icon, Icons.battery_full);
+    expect(createdService?.tracksMileage, isTrue);
+    expect(createdService?.shelfLifeMonths, isNull);
+  });
 
   testWidgets('Custom service always creates a single type01 service', (
     tester,
@@ -428,10 +471,6 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('service-preset-oil_filter')));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('add-service-name-field')),
-      'Oil filter',
-    );
     await _showOptionalServiceDetails(tester);
     await tester.enterText(
       find.byKey(const Key('add-service-note-field')),
@@ -482,7 +521,7 @@ Future<void> _scrollFormIntoView(WidgetTester tester, Finder finder) async {
     of: form,
     matching: find.byType(Scrollable),
   );
-    if (finder.evaluate().isEmpty && form.evaluate().isNotEmpty) {
+  if (finder.evaluate().isEmpty && form.evaluate().isNotEmpty) {
     final scrollState = tester.state<ScrollableState>(formScrollables.first);
     scrollState.position.jumpTo(
       finder.evaluate().isEmpty &&

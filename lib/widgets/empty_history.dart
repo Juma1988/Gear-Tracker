@@ -9,17 +9,27 @@ class EmptyHistory extends StatelessWidget {
     super.key,
     required this.title,
     this.serviceName,
+    this.bottomNavigationBar,
+    this.floatingActionButton,
+    this.floatingActionButtonLocation,
   });
 
   final String title;
   final String? serviceName;
+  final Widget? bottomNavigationBar;
+  final Widget? floatingActionButton;
+  final FloatingActionButtonLocation? floatingActionButtonLocation;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
+      floatingActionButtonAnimator: FloatingActionButtonAnimator.noAnimation,
       appBar: AppBar(title: Text(title)),
+      floatingActionButton: floatingActionButton,
+      floatingActionButtonLocation: floatingActionButtonLocation,
+      bottomNavigationBar: bottomNavigationBar,
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(AppTokens.spaceXxl),

@@ -12,18 +12,20 @@
 library;
 
 import '../models/service_history_entry.dart';
+import '../models/fuel_entry.dart';
 import '../models/service_item.dart';
 import '../models/tire_item.dart';
 import '../models/vehicle_profile.dart';
 import 'data.dart';
 
 class GarageSnapshot {
-  static const currentSchemaVersion = 7;
+  static const currentSchemaVersion = 9;
   const GarageSnapshot({
     required this.odometer,
     required this.services,
     required this.tires,
     required this.history,
+    this.fuelEntries = const [],
     this.lastUpdatedAt,
   });
 
@@ -31,6 +33,7 @@ class GarageSnapshot {
   final List<ServiceItem> services;
   final List<TireItem> tires;
   final List<ServiceHistoryEntry> history;
+  final List<FuelEntry> fuelEntries;
 
   /// The last time this snapshot was successfully persisted locally.
   ///
@@ -59,7 +62,9 @@ class GarageSnapshot {
     'services': services.map((item) => item.toJson()).toList(),
     'tires': tires.map((item) => item.toJson()).toList(),
     'history': history.map((entry) => entry.toJson()).toList(),
-    if (lastUpdatedAt != null) 'lastUpdatedAt': lastUpdatedAt!.toUtc().toIso8601String(),
+    'fuelEntries': fuelEntries.map((entry) => entry.toJson()).toList(),
+    if (lastUpdatedAt != null)
+      'lastUpdatedAt': lastUpdatedAt!.toUtc().toIso8601String(),
   };
 
   factory GarageSnapshot.fromJson(Map<String, dynamic> json) {
@@ -80,6 +85,10 @@ class GarageSnapshot {
       json,
       'history',
     ).map(ServiceHistoryEntry.fromJson).toList(growable: false);
+    final fuelEntries = _objectList(
+      json,
+      'fuelEntries',
+    ).map(FuelEntry.fromJson).toList(growable: false);
     final lastUpdatedAt = _optionalTimestamp(json, 'lastUpdatedAt');
 
     final snapshot = GarageSnapshot(
@@ -87,6 +96,7 @@ class GarageSnapshot {
       services: services,
       tires: tires,
       history: history,
+      fuelEntries: fuelEntries,
       lastUpdatedAt: lastUpdatedAt,
     );
     snapshot.validate();
@@ -102,6 +112,7 @@ class GarageSnapshot {
       throw const FormatException('Unsupported garage snapshot schema');
     }
     migrated['schemaVersion'] = currentSchemaVersion;
+    migrated.putIfAbsent('fuelEntries', () => const []);
     final services = _objectList(migrated, 'services');
     migrated['services'] = services
         .map((service) {
@@ -126,8 +137,12 @@ class GarageSnapshot {
   }
 
   void validate() {
+    for (final entry in fuelEntries) {
+      entry.validate();
+    }
     final serviceIds = services.map((service) => service.id).toSet();
     final historyIds = history.map((entry) => entry.id).toSet();
+    final fuelIds = fuelEntries.map((entry) => entry.id).toSet();
     if (services.map((service) => service.id).toSet().length !=
             services.length ||
         services.any(
@@ -194,6 +209,17 @@ class GarageSnapshot {
                   entry.previousServiceOdometer != null &&
                   entry.completedOdometer! < entry.previousServiceOdometer!) ||
               !serviceIds.contains(entry.serviceId),
+        ) ||
+        fuelIds.length != fuelEntries.length ||
+        fuelEntries.any(
+          (entry) =>
+              entry.id.trim().isEmpty ||
+              entry.odometer < 0 ||
+              entry.odometer > 999999 ||
+              !entry.liters.isFinite ||
+              entry.liters <= 0 ||
+              !entry.cost.isFinite ||
+              entry.cost < 0,
         )) {
       throw const FormatException('Invalid garage snapshot data');
     }
@@ -313,10 +339,7 @@ class GarageConflictException extends GarageDataException {
   GarageConflictException({
     required this.expectedRevision,
     required this.actualRevision,
-  }) : super(
-         GarageFailureKind.conflict,
-         'Garage changed since it was read',
-       );
+  }) : super(GarageFailureKind.conflict, 'Garage changed since it was read');
 
   final int expectedRevision;
   final int actualRevision;
@@ -410,30 +433,52 @@ class GarageCollection {
       ...json,
       'schemaVersion': currentSchemaVersion,
       if (schemaVersion == 1) 'defaultVehicleId': lastUsedVehicleId,
-      'vehicles': rawVehicles.map((rawVehicle) {
-        if (rawVehicle is! Map) throw const FormatException('Invalid vehicle');
-        final vehicle = Map<String, dynamic>.from(rawVehicle);
-        final rawGarage = vehicle['garage'];
-        if (rawGarage is! Map) throw const FormatException('Invalid garage');
-        final garage = Map<String, dynamic>.from(rawGarage);
-        final snapshotVersion = garage['schemaVersion'];
-        if (snapshotVersion is! int ||
-            snapshotVersion < 2 ||
-            snapshotVersion > GarageSnapshot.currentSchemaVersion) {
-          throw const FormatException('Unsupported garage snapshot schema');
-        }
-        final snapshot = snapshotVersion == GarageSnapshot.currentSchemaVersion
-            ? GarageSnapshot.fromJson(garage)
-            : GarageSnapshot.migrate(garage);
-        vehicle['garage'] = snapshot.toJson();
-        return vehicle;
-      }).toList(growable: false),
+      'vehicles': rawVehicles
+          .map((rawVehicle) {
+            if (rawVehicle is! Map) {
+              throw const FormatException('Invalid vehicle');
+            }
+            final vehicle = Map<String, dynamic>.from(rawVehicle);
+            final rawGarage = vehicle['garage'];
+            if (rawGarage is! Map) {
+              throw const FormatException('Invalid garage');
+            }
+            final garage = Map<String, dynamic>.from(rawGarage);
+            final snapshotVersion = garage['schemaVersion'];
+            if (snapshotVersion is! int ||
+                snapshotVersion < 2 ||
+                snapshotVersion > GarageSnapshot.currentSchemaVersion) {
+              throw const FormatException('Unsupported garage snapshot schema');
+            }
+            final snapshot =
+                snapshotVersion == GarageSnapshot.currentSchemaVersion
+                ? GarageSnapshot.fromJson(garage)
+                : GarageSnapshot.migrate(garage);
+            vehicle['garage'] = {
+              ...snapshot.toJson(),
+              'fuelEntries': snapshot.fuelEntries
+                  .map(
+                    (e) => e.vehicleId == '__legacy__'
+                        ? e.withOwnership(vehicle['id'] as String).toJson()
+                        : e.toJson(),
+                  )
+                  .toList(),
+            };
+            return vehicle;
+          })
+          .toList(growable: false),
     };
     return GarageCollection.fromJson(migrated);
   }
 
   void validate() {
     final ids = vehicles.map((vehicle) => vehicle.id).toSet();
+    for (final vehicle in vehicles) {
+      vehicle.fuelPreferences.validate();
+      if (vehicle.garage.fuelEntries.any((e) => e.vehicleId != vehicle.id)) {
+        throw const FormatException('Fuel entry belongs to another vehicle');
+      }
+    }
     if (ids.length != vehicles.length ||
         vehicles.any(
           (vehicle) =>

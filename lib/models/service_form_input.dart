@@ -114,6 +114,7 @@ class ServiceFormInput {
     required String iconKey,
     ServiceType type = ServiceType.type01,
     List<ServiceUnit> units = const [],
+    bool isCustom = false,
   }) {
     if (!isValid) {
       throw StateError('Service form input is not valid');
@@ -127,6 +128,7 @@ class ServiceFormInput {
       iconKey: iconKey,
       installDate: tracksTime ? installDate : null,
       shelfLifeMonths: tracksTime ? int.parse(shelfLifeMonths.trim()) : null,
+      isCustom: isCustom,
       type: type,
       units: units,
     );

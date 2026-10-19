@@ -80,9 +80,7 @@ void main() {
     expect(find.text('السوائل والفلاتر'), findsOneWidget);
   });
 
-  testWidgets('Arabic preset autofills the service name in Arabic', (
-    tester,
-  ) async {
+  testWidgets('Arabic preset shows its selected service name', (tester) async {
     await tester.pumpWidget(
       _localizedApp(const AddServiceScreen(), locale: const Locale('ar')),
     );
@@ -91,15 +89,8 @@ void main() {
     await tester.tap(find.byKey(const Key('service-preset-oil')));
     await tester.pumpAndSettle();
 
-    expect(
-      tester
-          .widget<TextFormField>(
-            find.byKey(const Key('add-service-name-field')),
-          )
-          .controller!
-          .text,
-      'زيت المحرك',
-    );
+    expect(find.text('زيت المحرك'), findsOneWidget);
+    expect(find.byKey(const Key('add-service-name-field')), findsNothing);
   });
 
   group('preset search', () {

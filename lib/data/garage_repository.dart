@@ -96,10 +96,7 @@ class GarageRepository {
         if (collection.vehicles.isEmpty) return GarageSnapshot.empty();
         return collection.selectedVehicle.garage;
       }
-      final snapshot = await _loadLegacySnapshot(
-        raw,
-        persistMigration: true,
-      );
+      final snapshot = await _loadLegacySnapshot(raw, persistMigration: true);
       return snapshot;
     } on GarageDataException {
       rethrow;
@@ -141,7 +138,9 @@ class GarageRepository {
       );
     }
     try {
-      final saved = await _storage.write(jsonEncode(_stamped(snapshot).toJson()));
+      final saved = await _storage.write(
+        jsonEncode(_stamped(snapshot).toJson()),
+      );
       if (!saved) throw StateError('Garage snapshot was not saved');
     } catch (error) {
       throw GarageDataException(
@@ -164,8 +163,17 @@ class GarageRepository {
     try {
       final json = _decode(raw);
       if (json.containsKey('vehicles')) {
-        final collection = GarageCollection.fromJson(json);
-        if (json['schemaVersion'] != 2) {
+        final needsMigration =
+            json['schemaVersion'] != 2 ||
+            (json['vehicles'] as List).any(
+              (v) =>
+                  (v as Map)['garage']['schemaVersion'] !=
+                  GarageSnapshot.currentSchemaVersion,
+            );
+        final collection = needsMigration
+            ? GarageCollection.migrate(json)
+            : GarageCollection.fromJson(json);
+        if (needsMigration) {
           await _backupBeforeMigration(raw);
           await saveCollection(collection);
         }
@@ -335,6 +343,7 @@ class GarageRepository {
     services: snapshot.services,
     tires: snapshot.tires,
     history: snapshot.history,
+    fuelEntries: snapshot.fuelEntries,
     lastUpdatedAt: _now().toUtc(),
   );
 
@@ -401,12 +410,18 @@ class GarageRepository {
 
   GarageCollection _collectionFromLegacy(GarageSnapshot legacy) {
     const id = '2022-golf-gti';
+    final bound = GarageSnapshot.fromJson({
+      ...legacy.toJson(),
+      'fuelEntries': legacy.fuelEntries
+          .map((e) => e.withOwnership(id).toJson())
+          .toList(),
+    });
     final vehicle = VehicleProfile(
       id: id,
       year: 2022,
       make: 'Volkswagen',
       model: 'Golf GTI',
-      garage: legacy,
+      garage: bound,
     );
     return GarageCollection(
       vehicles: [vehicle],
@@ -415,4 +430,3 @@ class GarageRepository {
     );
   }
 }
-

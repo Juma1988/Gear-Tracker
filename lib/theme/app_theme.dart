@@ -39,7 +39,9 @@ class AppTheme {
           onSurface: const Color(0xFFDFE2EE),
           onSurfaceVariant: const Color(0xFFBAC9CC),
           outline: const Color(0xFF849396),
-          tertiary: const Color(0xFFFFB95F),
+          tertiary: const Color(0xFFFFCE54),
+          tertiaryContainer: const Color(0xFF665000),
+          onTertiaryContainer: const Color(0xFFFFDF80),
           error: const Color(0xFFFFB4AB),
         );
     return ThemeData(

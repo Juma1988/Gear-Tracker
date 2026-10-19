@@ -1,5 +1,8 @@
 import '../data/garage_repository.dart';
 import '../models/service_history_entry.dart';
+import '../models/fuel_entry.dart';
+import '../models/fuel_calculations.dart';
+import '../models/fuel_preferences.dart';
 import '../models/service_item.dart';
 import '../models/tire_item.dart';
 import '../models/vehicle_profile.dart';
@@ -15,12 +18,81 @@ class DashboardController {
     : repository = repository ?? GarageRepository();
 
   final GarageRepository repository;
+  bool _fuelWritePending = false;
+
+  Future<bool> saveFuel(FuelEntry entry, {required int usualGrade}) async {
+    if (_fuelWritePending || vehicle?.id != entry.vehicleId) return false;
+    try {
+      entry.validate();
+      if (entry.fullTank == null ||
+          !FuelCalculations.fitsOdometerOrder(entry, fuelEntries)) {
+        return false;
+      }
+      final next = [...fuelEntries.where((e) => e.id != entry.id), entry];
+      final prices = {...vehicle!.fuelPreferences.prices};
+      // The most recently saved input is the next-entry suggestion, even
+      // when the user is adding a backdated fill or correcting an old one.
+      prices[entry.grade] = entry.recordedPrice ?? entry.pricePerLiter;
+      return await _persistFuel(
+        next,
+        FuelPreferences(
+          usualGrade: usualGrade,
+          prices: Map.unmodifiable(prices),
+        ),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteFuel(String vehicleId, String id) async {
+    if (_fuelWritePending || vehicle?.id != vehicleId) return false;
+    return _persistFuel(
+      FuelCalculations.withoutEntry(fuelEntries, vehicleId, id),
+      vehicle!.fuelPreferences,
+    );
+  }
+
+  Future<bool> _persistFuel(
+    List<FuelEntry> entries,
+    FuelPreferences preferences,
+  ) async {
+    final current = vehicle;
+    final garage = collection;
+    if (current == null || garage == null) return false;
+    _fuelWritePending = true;
+    final revision = repository.revision;
+    try {
+      final updated = current.copyWith(
+        fuelPreferences: preferences,
+        garage: GarageSnapshot(
+          odometer: current.garage.odometer,
+          services: services,
+          tires: tires,
+          history: history,
+          fuelEntries: List.unmodifiable(entries),
+          lastUpdatedAt: DateTime.now().toUtc(),
+        ),
+      );
+      return await saveCollection(
+        garage.copyWith(
+          vehicles: [
+            for (final v in garage.vehicles) v.id == updated.id ? updated : v,
+          ],
+        ),
+        expectedRevision: revision,
+      );
+    } finally {
+      _fuelWritePending = false;
+    }
+  }
 
   GarageCollection? collection;
   VehicleProfile? vehicle;
   List<ServiceItem> services = const [];
   List<TireItem> tires = const [];
   List<ServiceHistoryEntry> history = const [];
+  List<FuelEntry> fuelEntries = const [];
   String savedOdometer = '000000';
   String displayedOdometer = '000000';
   String stagedOdometer = '000000';
@@ -77,6 +149,7 @@ class DashboardController {
       services = const [];
       tires = const [];
       history = const [];
+      fuelEntries = const [];
     } else {
       _selectLoadedVehicle(next.selectedVehicle);
     }
@@ -88,6 +161,7 @@ class DashboardController {
     List<ServiceItem>? nextServices,
     List<TireItem>? nextTires,
     List<ServiceHistoryEntry>? nextHistory,
+    List<FuelEntry>? nextFuelEntries,
     String? odometer,
   }) async {
     final currentCollection = collection;
@@ -99,6 +173,7 @@ class DashboardController {
         services: nextServices ?? services,
         tires: nextTires ?? tires,
         history: nextHistory ?? history,
+        fuelEntries: nextFuelEntries ?? fuelEntries,
         lastUpdatedAt: DateTime.now().toUtc(),
       ),
     );
@@ -136,5 +211,6 @@ class DashboardController {
     services = snapshot.services;
     tires = snapshot.tires;
     history = snapshot.history;
+    fuelEntries = snapshot.fuelEntries;
   }
 }

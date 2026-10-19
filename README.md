@@ -27,7 +27,7 @@ Built with Flutter, the interface pairs deep navy surfaces with mint accents and
 | **Editable service details** | Tap a service card to change its name, note, installation date, installation KM, and interval. |
 | **Editable tire records** | Double-tap an individual tire to change its installation date, installation KM, and lifespan interval. |
 | **On-device storage** | Odometer, service configuration, and tire records are serialized as a JSON snapshot through `shared_preferences`. No cloud sync is implemented. |
-| **Dashboard navigation** | Header history shows all records. Each service card also has a history button that filters records by that service's stable ID. Settings and Services remain available from the dashboard. |
+| **Navigation and history** | A static bottom bar switches between Home and Overall History, with a raised Add service action. Each service keeps its own filtered history. The bar is hidden while the Add service flow is open. |
 
 ### Reading the dashboard
 
@@ -47,7 +47,7 @@ These are **mileage-based estimates**, not measured component condition. Install
 
 1. Open the dashboard. A fresh installation starts with **74,850 KM**, an Engine Oil entry, and four tire records from [`lib/data/data.dart`](lib/data/data.dart)—starter data, not readings from your vehicle.
 2. Scroll an odometer digit. After editing settles, the dashboard waits two seconds before saving the staged reading and refreshing maintenance values.
-3. Tap **Engine Oil** to adjust its details, use its history button for its own history, or tap a tire position to edit that tire.
+3. Use **History** in the bottom bar to see all completion records; open a service's own history from its editor. Tap a tire position to edit that tire.
 
 **Current limits:** Services and Settings have minimal placeholder content. The app does not yet create completion records, so history only displays records already present in local data. The vehicle selector also displays a coming-soon message. There is no backup import/export or multi-vehicle management yet; the UI is English and uses kilometers.
 

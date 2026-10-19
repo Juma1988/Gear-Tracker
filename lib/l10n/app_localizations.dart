@@ -38,6 +38,39 @@ class AppLocalizations {
       ? 'يغيّر هذا إعدادات الصيانة. استخدم «تسجيل إتمام الصيانة» عند استبدال الجزء.'
       : 'This changes the service configuration. Use Mark serviced when the service has been replaced.';
   String get addService => isArabic ? 'إضافة صيانة' : 'Add service';
+  String get dashboardTab => isArabic ? 'لوحة التحكم' : 'Dashboard';
+  String get servicesTab => isArabic ? 'الصيانة' : 'Services';
+  String get dailyOdometerTitle =>
+      isArabic ? 'تحديث عداد المسافة' : 'Update odometer';
+  String get dailyOdometerHint => isArabic
+      ? 'حدّث قراءة اليوم لتحافظ على دقة حالة الصيانة.'
+      : 'Update today’s reading to keep maintenance status accurate.';
+  String get dailyOdometerRangeError => isArabic
+      ? 'يجب ألا تقل القراءة عن القراءة الحالية وألا تزيد عن 999999 كم.'
+      : 'Use a reading at least as high as the current one, up to 999999 km.';
+  String get notNow => isArabic ? 'ليس الآن' : 'Not now';
+  String get noServicesInStatus =>
+      isArabic ? 'لا توجد عناصر في هذه الحالة.' : 'No items in this status.';
+  String get overallHistoryTab => isArabic ? 'السجل' : 'History';
+  String get fuelTab => isArabic ? 'الوقود' : 'Fuel';
+  String get addFuelEntry => isArabic ? 'إضافة تعبئة وقود' : 'Add fuel entry';
+  String get fuelLiters => isArabic ? 'اللترات' : 'Liters';
+  String get fuelCost => isArabic ? 'التكلفة' : 'Cost';
+  String get noFuelEntries => isArabic
+      ? 'لا توجد سجلات وقود بعد. أضف أول تعبئة.'
+      : 'No fuel entries yet. Add your first fill-up.';
+  String get enterValidFuelValue =>
+      isArabic ? 'أدخل قيمة صحيحة' : 'Enter a valid value';
+  String get serviceCreationSection =>
+      isArabic ? 'إنشاء الصيانة' : 'Service creation';
+  String get customServicePreferenceTitle =>
+      isArabic ? 'افتح قائمة الصيانة من زر +' : 'Open preset list from +';
+  String get customServicePreferenceOn => isArabic
+      ? 'يفتح زر + قائمة الصيانات والخيارات المخصصة.'
+      : 'The + button opens service presets and custom options.';
+  String get customServicePreferenceOff => isArabic
+      ? 'ينقلك زر + مباشرة إلى إعداد صيانة مخصصة.'
+      : 'The + button goes straight to custom-service setup.';
   String get serviceDetails => isArabic ? 'تفاصيل الصيانة' : 'Service details';
   String get serviceName => isArabic ? 'اسم الصيانة' : 'Service name';
   String get enterServiceName =>
@@ -384,19 +417,22 @@ class AppLocalizations {
   String removeService(String name) =>
       isArabic ? 'إزالة $name؟' : 'Remove $name?';
   String get addServiceTitle => isArabic ? 'إضافة صيانة' : 'Add Service';
+
+  String get recordServiceTitle =>
+      isArabic ? 'تسجيل الصيانة' : 'Record service';
   String get serviceCardActionsTitle =>
       isArabic ? 'إجراءات الصيانة' : 'Service actions';
   String serviceCardActionsMessage(String name) => isArabic
       ? 'ماذا تريد أن تفعل مع $name؟'
       : 'What would you like to do with $name?';
   String get serviceActionMarkServiced =>
-      isArabic ? 'تسجيل إتمام الصيانة' : 'Mark serviced';
+      isArabic ? 'تسجيل الصيانة' : 'Record service';
   String get lastServicedLabel => isArabic ? 'آخر صيانة' : 'Last serviced';
   String get trackingSummaryLabel => isArabic ? 'التتبع' : 'Tracking';
-  String get trackingMileageSummary => isArabic ? 'المسافة' : 'Mileage';
+  String get trackingMileageSummary => isArabic ? 'المسافة' : 'Distance';
   String get trackingTimeSummary => isArabic ? 'الوقت' : 'Time';
   String get trackingBothSummary =>
-      isArabic ? 'المسافة والوقت' : 'Mileage and time';
+      isArabic ? 'المسافة والوقت' : 'Distance and time';
   String get noServiceHistoryShort =>
       isArabic ? 'لا توجد صيانة مسجلة' : 'No service recorded';
   String get changeIcon => isArabic ? 'تغيير الأيقونة' : 'Change icon';
@@ -464,7 +500,7 @@ class AppLocalizations {
   String get addAnyway => isArabic ? 'إضافة على أي حال' : 'Add anyway';
   String get trackServiceBy =>
       isArabic ? 'تتبع الصيانة بواسطة' : 'Track service by';
-  String get trackingModeMileage => isArabic ? 'المسافة' : 'Mileage';
+  String get trackingModeMileage => isArabic ? 'المسافة' : 'Distance';
   String get trackingModeTime => isArabic ? 'الوقت' : 'Time';
   String get trackingModeBoth => isArabic ? 'كلاهما' : 'Both';
   String get mileageDescription =>
@@ -482,7 +518,7 @@ class AppLocalizations {
   String get previewInstalled => isArabic ? 'التثبيت' : 'Installed';
   String get previewEnterInstallKm =>
       isArabic ? 'أدخل كم التركيب' : 'Enter install km';
-  String get previewMileage => isArabic ? 'المسافة' : 'Mileage';
+  String get previewMileage => isArabic ? 'المسافة' : 'Distance';
   String get previewEnterInterval =>
       isArabic ? 'أدخل الفترة' : 'Enter interval';
   String get previewEnterShelfLife =>
@@ -513,8 +549,11 @@ class AppLocalizations {
 
   // --- History ---
 
-  String get serviceHistory => isArabic ? 'سجل الصيانة' : 'Service history';
+  String get serviceHistory =>
+      isArabic ? 'سجل الصيانة العام' : 'Overall history';
   String historyTitle(String name) => isArabic ? 'سجل $name' : '$name history';
+  String get viewServiceHistory =>
+      isArabic ? 'عرض سجل الصيانة' : 'View history';
   String get noServiceHistoryYet =>
       isArabic ? 'لا يوجد سجل صيانة بعد' : 'No service history yet';
   String get completedServiceUpdatesWillAppear => isArabic
@@ -588,6 +627,7 @@ class AppLocalizations {
       isArabic ? 'تفاصيل الجدولة' : 'Schedule details';
   String get needsAttention =>
       isArabic ? 'يحتاج إلى اهتمام' : 'Needs attention';
+  String get criticalStatusLabel => isArabic ? 'حرج' : 'Critical';
   String needsAttentionCount(int count) => isArabic
       ? '$count عنصر يحتاج إلى اهتمام'
       : '$count item${count == 1 ? '' : 's'} need${count == 1 ? 's' : ''} attention';

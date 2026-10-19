@@ -25,6 +25,8 @@ import 'package:app/widgets/service_health_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:app/preferences/service_preferences.dart';
 
 const _l10n = AppLocalizations(Locale('en'));
 
@@ -271,7 +273,10 @@ void main() {
       final node = find.bySemanticsLabel(RegExp('Front left tire'));
       expect(node, findsOneWidget);
       expect(
-        tester.getSemantics(node).getSemanticsData().hasAction(SemanticsAction.tap),
+        tester
+            .getSemantics(node)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
         isTrue,
       );
 
@@ -384,6 +389,189 @@ void main() {
         );
       },
     );
+  });
+
+  group('static bottom navigation', () {
+    testWidgets('service dialog opens that service history', (tester) async {
+      final entry = ServiceHistoryEntry(
+        id: 'engine-oil-history',
+        serviceId: 'engine-oil',
+        serviceName: 'Engine Oil',
+        completedOdometer: 70000,
+        newNote: '',
+        newIntervalKm: 20000,
+        completedAt: DateTime(2026, 3, 8),
+      );
+      await tester.pumpWidget(
+        _dashboard(_RecordingStorage(_collectionJson(history: [entry]))),
+      );
+      await tester.pumpAndSettle();
+
+      final content = find.byKey(
+        const Key('service-health-card-content-engine-oil'),
+      );
+      await tester.ensureVisible(content);
+      await tester.tap(
+        find.descendant(of: content, matching: find.byType(InkWell)).first,
+      );
+      await tester.pumpAndSettle();
+      final historyAction = find.byKey(
+        const Key('service-dialog-history-action'),
+      );
+      final editAction = find.byKey(const Key('service-dialog-edit-action'));
+      final recordAction = find.byKey(
+        const Key('service-dialog-record-action'),
+      );
+      expect(
+        tester.getSize(historyAction).width,
+        tester.getSize(editAction).width,
+      );
+      expect(
+        tester.getSize(historyAction).width,
+        tester.getSize(recordAction).width,
+      );
+      expect(tester.widget(historyAction), isA<OutlinedButton>());
+      expect(tester.widget(editAction), isA<OutlinedButton>());
+      expect(tester.widget(recordAction), isA<OutlinedButton>());
+      await tester.ensureVisible(historyAction);
+      await tester.tap(historyAction);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Engine Oil history'), findsOneWidget);
+      expect(find.text('Engine Oil'), findsOneWidget);
+      expect(find.text('Battery'), findsNothing);
+    });
+
+    testWidgets('record action is emphasized at Warning health or worse', (
+      tester,
+    ) async {
+      final warningService = _service(
+        'engine-oil',
+        'Engine Oil',
+      ).copyWith(intervalKm: 6000);
+      await tester.pumpWidget(
+        _dashboard(
+          _RecordingStorage(_collectionJson(services: [warningService])),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final content = find.byKey(
+        const Key('service-health-card-content-engine-oil'),
+      );
+      await tester.ensureVisible(content);
+      await tester.tap(
+        find.descendant(of: content, matching: find.byType(InkWell)).first,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget(find.byKey(const Key('service-dialog-record-action'))),
+        isA<FilledButton>(),
+      );
+    });
+
+    testWidgets(
+      'opens overall history, returns home, and hides navigation on Add service',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final history = [
+          ServiceHistoryEntry(
+            id: 'history-engine',
+            serviceId: 'engine-oil',
+            serviceName: 'Engine Oil',
+            completedOdometer: 60000,
+            newNote: '',
+            newIntervalKm: 10000,
+            completedAt: DateTime(2026, 1, 1),
+          ),
+          ServiceHistoryEntry(
+            id: 'history-battery',
+            serviceId: 'battery',
+            serviceName: 'Battery replacement',
+            completedOdometer: 65000,
+            newNote: '',
+            newIntervalKm: 30000,
+            completedAt: DateTime(2026, 2, 1),
+          ),
+        ];
+        await tester.pumpWidget(
+          _dashboard(_RecordingStorage(_collectionJson(history: history))),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<BottomAppBar>(find.byType(BottomAppBar)).height,
+          68,
+        );
+
+        await tester.tap(find.byKey(const Key('bottom-nav-history')));
+        await tester.pumpAndSettle();
+        expect(find.text('Overall history'), findsOneWidget);
+        expect(find.text('Engine Oil'), findsOneWidget);
+        expect(find.text('Battery replacement'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('bottom-nav-home')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('bottom-nav-add-service')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('bottom-nav-add-service')));
+        await tester.pumpAndSettle();
+        expect(find.text(_l10n.chooseIcon), findsOneWidget);
+        expect(find.byKey(const Key('bottom-nav-home')), findsNothing);
+      },
+    );
+
+    testWidgets('plus follows the persisted customService preference', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(_dashboard(_RecordingStorage(_collectionJson())));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('bottom-nav-add-service')));
+      await tester.pumpAndSettle();
+      expect(find.text(_l10n.chooseIcon), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      await ServicePreferences.saveCustomService(true);
+      await tester.tap(find.byKey(const Key('bottom-nav-add-service')));
+      await tester.pumpAndSettle();
+      expect(find.text(_l10n.addServiceTitle), findsOneWidget);
+      expect(
+        find.byKey(const Key('start-custom-service-button')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('direct custom Back exits to dashboard from picker and form', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(_dashboard(_RecordingStorage(_collectionJson())));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('bottom-nav-add-service')));
+      await tester.pumpAndSettle();
+      expect(find.text(_l10n.chooseIcon), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bottom-nav-home')), findsOneWidget);
+      expect(find.text(_l10n.chooseIcon), findsNothing);
+
+      await tester.tap(find.byKey(const Key('bottom-nav-add-service')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('custom-service-icon-auto')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('add-service-name-field')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bottom-nav-home')), findsOneWidget);
+      expect(find.byKey(const Key('add-service-name-field')), findsNothing);
+    });
   });
 }
 

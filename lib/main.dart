@@ -133,7 +133,9 @@ class GearTrackerAppState extends State<GearTrackerApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: _usesTelemetryTheme ? AppTheme.telemetry() : AppTheme.classic(),
-      home: const DevOverlay(child: DashboardScreen()),
+      home: const DevOverlay(
+        child: DashboardScreen(enableDailyOdometerPrompt: true),
+      ),
     );
   }
 }

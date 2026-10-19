@@ -230,6 +230,8 @@ class AddServiceScreen extends StatefulWidget {
     this.currentOdometer = 0,
     this.existingServices = const [],
     this.hasTires = false,
+    this.recordingService,
+    this.openCustomServiceDirectly = false,
   });
 
   final int currentOdometer;
@@ -237,6 +239,8 @@ class AddServiceScreen extends StatefulWidget {
 
   /// Whether the active vehicle already tracks tire health.
   final bool hasTires;
+  final ServiceItem? recordingService;
+  final bool openCustomServiceDirectly;
 
   @override
   State<AddServiceScreen> createState() => _AddServiceScreenState();
@@ -251,6 +255,11 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
   void initState() {
     super.initState();
     DevOverlay.currentFilePath = 'lib/screens/add_service_screen.dart';
+    if (widget.openCustomServiceDirectly) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openCustomService();
+      });
+    }
   }
 
   @override
@@ -268,8 +277,9 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
     required String iconKey,
     required IconData icon,
     ServiceType serviceType = ServiceType.type01,
+    ServiceItem? recordingService,
   }) async {
-    final service = await Navigator.of(context).push<ServiceItem>(
+    final result = await Navigator.of(context).push<Object>(
       MaterialPageRoute(
         builder: (_) => ServiceFormScreen(
           currentOdometer: widget.currentOdometer,
@@ -280,16 +290,22 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
           existingServiceNames: widget.existingServices.map(
             (service) => service.name,
           ),
+          recordingService: recordingService,
+          returnToDashboardOnBack: widget.openCustomServiceDirectly,
         ),
       ),
     );
-    if (!mounted || service == null) return;
-    Navigator.of(context).pop(service);
+    if (!mounted || result == null) return;
+    Navigator.of(context).pop(result);
   }
 
   Future<void> _openCustomService() async {
     final selectedIcon = await Navigator.of(context).push<ServicePreset>(
-      MaterialPageRoute(builder: (_) => const _CustomServiceIconPicker()),
+      MaterialPageRoute(
+        builder: (_) => _CustomServiceIconPicker(
+          returnToDashboardOnBack: widget.openCustomServiceDirectly,
+        ),
+      ),
     );
     if (!mounted || selectedIcon == null) return;
     await _openForm(iconKey: selectedIcon.iconKey, icon: selectedIcon.icon);
@@ -348,23 +364,35 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
       return _tireHealthCard(l10n);
     }
     final addedService = _addedServiceFor(preset);
+    final isRecordingTarget =
+        widget.recordingService != null &&
+        addedService != null &&
+        widget.recordingService!.id == addedService.id;
     return ServicePickerCard(
       key: Key('service-preset-${preset.iconKey}'),
       title: servicePresetDisplayName(l10n, preset),
       subtitle: l10n.servicePresetDescription(preset.iconKey),
       icon: preset.icon,
       isSelected: addedService != null,
-      onTap: addedService == null
+      onTap: isRecordingTarget
+          ? () => _openForm(
+              presetName: addedService.name,
+              iconKey: addedService.iconKey,
+              icon: addedService.icon,
+              serviceType: addedService.type,
+              recordingService: addedService,
+            )
+          : addedService == null
           ? () => _openForm(
               presetName: servicePresetDisplayName(l10n, preset),
               iconKey: preset.iconKey,
               icon: preset.icon,
             )
           : null,
-      onLongPress: addedService == null
+      onLongPress: addedService == null || isRecordingTarget
           ? null
           : () => _removeAddedService(addedService),
-      trailing: addedService == null
+      trailing: addedService == null || isRecordingTarget
           ? null
           : CardActionMenu(
               key: Key('service-preset-menu-${preset.iconKey}'),
@@ -519,7 +547,11 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                     ),
                   ),
                 )
-              : Text(l10n.addServiceTitle),
+              : Text(
+                  widget.recordingService == null
+                      ? l10n.addServiceTitle
+                      : l10n.recordServiceTitle,
+                ),
         ),
         actions: [
           if (!_searchExpanded)
@@ -540,7 +572,15 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
               title: l10n.customService,
               subtitle: l10n.customServiceDescription,
               icon: Icons.build_outlined,
-              onTap: _openCustomService,
+              onTap: widget.recordingService == null
+                  ? _openCustomService
+                  : () => _openForm(
+                      presetName: widget.recordingService!.name,
+                      iconKey: widget.recordingService!.iconKey,
+                      icon: widget.recordingService!.icon,
+                      serviceType: widget.recordingService!.type,
+                      recordingService: widget.recordingService,
+                    ),
             ),
             const SizedBox(height: 16),
             const SizedBox(height: 4),
@@ -553,72 +593,96 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
 }
 
 class _CustomServiceIconPicker extends StatelessWidget {
-  const _CustomServiceIconPicker();
+  const _CustomServiceIconPicker({this.returnToDashboardOnBack = false});
+
+  final bool returnToDashboardOnBack;
+
+  void _handleBack(BuildContext context) {
+    if (returnToDashboardOnBack) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      Navigator.of(context).pop();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.chooseIcon)),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-              child: Text(
-                l10n.chooseIconInstruction,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: OutlinedButton.icon(
-                key: const Key('custom-service-icon-auto'),
-                onPressed: () => Navigator.of(context).pop(
-                  const ServicePreset(
-                    name: 'General maintenance',
-                    iconKey: 'maintenance',
-                    icon: Icons.build_outlined,
-                    category: ServicePresetCategory.other,
+    return PopScope<Object>(
+      canPop: !returnToDashboardOnBack,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && returnToDashboardOnBack) _handleBack(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.chooseIcon),
+          leading: returnToDashboardOnBack
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => _handleBack(context),
+                )
+              : null,
+        ),
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                child: Text(
+                  l10n.chooseIconInstruction,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                icon: const Icon(Icons.auto_awesome),
-                label: Text(l10n.useAutomaticIcon),
               ),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 600 ? 4 : 3;
-                  return GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: .9,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: OutlinedButton.icon(
+                  key: const Key('custom-service-icon-auto'),
+                  onPressed: () => Navigator.of(context).pop(
+                    const ServicePreset(
+                      name: 'General maintenance',
+                      iconKey: 'maintenance',
+                      icon: Icons.build_outlined,
+                      category: ServicePresetCategory.other,
                     ),
-                    itemCount: customServiceIconLibrary.length,
-                    itemBuilder: (context, index) {
-                      final icon = customServiceIconLibrary[index];
-                      return _CustomServiceIconTile(
-                        icon: icon,
-                        displayName: l10n.servicePresetName(
-                          icon.iconKey,
-                          icon.name,
-                        ),
-                        onTap: () => Navigator.of(context).pop(icon),
-                      );
-                    },
-                  );
-                },
+                  ),
+                  icon: const Icon(Icons.auto_awesome),
+                  label: Text(l10n.useAutomaticIcon),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = constraints.maxWidth >= 600 ? 4 : 3;
+                    return GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: .9,
+                      ),
+                      itemCount: customServiceIconLibrary.length,
+                      itemBuilder: (context, index) {
+                        final icon = customServiceIconLibrary[index];
+                        return _CustomServiceIconTile(
+                          icon: icon,
+                          displayName: l10n.servicePresetName(
+                            icon.iconKey,
+                            icon.name,
+                          ),
+                          onTap: () => Navigator.of(context).pop(icon),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

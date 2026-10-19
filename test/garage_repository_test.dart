@@ -16,6 +16,7 @@ import 'package:app/widgets/odometer_card.dart';
 import 'package:app/widgets/history_entry_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _l10n = AppLocalizations(Locale('en'));
 const _numbers = DefaultMaterialLocalizations();
@@ -56,8 +57,12 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
     of: form,
     matching: find.byType(Scrollable),
   );
-  final isStickySave = finder.toString().contains('service-form-sticky-save-button');
-  if (!isStickySave && form.evaluate().isNotEmpty && formScrollable.evaluate().isNotEmpty) {
+  final isStickySave = finder.toString().contains(
+    'service-form-sticky-save-button',
+  );
+  if (!isStickySave &&
+      form.evaluate().isNotEmpty &&
+      formScrollable.evaluate().isNotEmpty) {
     await tester.scrollUntilVisible(
       finder,
       300,
@@ -75,16 +80,17 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
 }
 
 Future<void> _openCustomServiceForm(WidgetTester tester) async {
-  await tester.tap(find.byKey(const Key('start-custom-service-button')));
+  final customEntry = find.byKey(const Key('start-custom-service-button'));
+  if (customEntry.evaluate().isNotEmpty) {
+    await tester.tap(customEntry);
+  }
   await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const Key('custom-service-icon-maintenance')));
+  await tester.tap(find.byKey(const Key('custom-service-icon-auto')));
   await tester.pumpAndSettle();
 }
 
 Future<void> _showEditOptionalDetails(WidgetTester tester) async {
-  final toggle = find.byKey(
-    const Key('edit-service-optional-details-toggle'),
-  );
+  final toggle = find.byKey(const Key('edit-service-optional-details-toggle'));
   if (toggle.evaluate().isNotEmpty) {
     await tester.tap(toggle);
     await tester.pumpAndSettle();
@@ -99,10 +105,7 @@ Future<void> _showOptionalServiceDetails(WidgetTester tester) async {
     matching: find.byType(Scrollable),
   );
   if (toggle.evaluate().isEmpty && formScrollables.evaluate().isNotEmpty) {
-    tester
-        .state<ScrollableState>(formScrollables.first)
-        .position
-        .jumpTo(0);
+    tester.state<ScrollableState>(formScrollables.first).position.jumpTo(0);
     await tester.pump();
   }
   await tester.scrollUntilVisible(
@@ -117,6 +120,8 @@ Future<void> _showOptionalServiceDetails(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   test(
     'migrates a v2 snapshot to v3, preserves history, and rewrites it',
     () async {
@@ -133,7 +138,8 @@ void main() {
         }),
       );
 
-      final loaded = await GarageRepository(storage: storage).loadLegacySnapshot();
+      final loaded = await GarageRepository(storage: storage)
+          .loadLegacySnapshot();
 
       expect(loaded.odometer, 75000);
       expect(loaded.history.single.id, history.id);
@@ -356,7 +362,10 @@ void main() {
       );
       final repository = GarageRepository(storage: storage);
 
-      await expectLater(repository.loadLegacySnapshot(), throwsA(isA<GarageDataException>()));
+      await expectLater(
+        repository.loadLegacySnapshot(),
+        throwsA(isA<GarageDataException>()),
+      );
       expect(storage.writes, isEmpty);
     },
   );
@@ -422,7 +431,10 @@ void main() {
 
       await tester.tap(find.text('Retry'));
       await tester.pumpAndSettle();
-      expect((await repository.loadLegacySnapshot()).tires.first.installOdometer, 70000);
+      expect(
+        (await repository.loadLegacySnapshot()).tires.first.installOdometer,
+        70000,
+      );
       expect(find.text('FL tire saved'), findsOneWidget);
     },
   );
@@ -454,7 +466,7 @@ void main() {
       expect(find.text(_l10n.currentOdometer('76,000')), findsOneWidget);
       expect(
         find.byKey(const Key('mark-service-button'), skipOffstage: false),
-        findsOneWidget,
+        findsNothing,
       );
     },
   );
@@ -622,24 +634,10 @@ void main() {
       await tester.pumpAndSettle();
       await _openServiceCompletion(tester);
 
-      await _tapVisible(
-        tester,
-        find.byKey(const Key('mark-service-button'), skipOffstage: false),
-      );
-      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('service-completion-km-field')),
         '75500',
       );
-      await tester.tap(find.byKey(const Key('service-completion-date-button')));
-      await tester.pumpAndSettle();
-      await tester.drag(
-        find.byKey(const Key('service-completion-date-wheel')),
-        const Offset(0, -80),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('service-completion-date-done')));
-      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('service-completion-confirm-button')),
       );
@@ -739,11 +737,11 @@ void main() {
   testWidgets('rejects invalid service completion KM', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
-         home: EditServiceScreen(
-           service: _service,
-           currentOdometer: 76000,
-           openCompletionOnLaunch: true,
-         ),
+        home: EditServiceScreen(
+          service: _service,
+          currentOdometer: 76000,
+          openCompletionOnLaunch: true,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -802,11 +800,6 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _openServiceCompletion(tester);
-      await _tapVisible(
-        tester,
-        find.byKey(const Key('mark-service-button'), skipOffstage: false),
-      );
-      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('service-completion-confirm-button')),
       );
@@ -1000,7 +993,10 @@ void main() {
     );
     await _tapVisible(
       tester,
-      find.byKey(const Key('service-form-sticky-save-button'), skipOffstage: false),
+      find.byKey(
+        const Key('service-form-sticky-save-button'),
+        skipOffstage: false,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -1041,7 +1037,10 @@ void main() {
     );
     await _tapVisible(
       tester,
-      find.byKey(const Key('service-form-sticky-save-button'), skipOffstage: false),
+      find.byKey(
+        const Key('service-form-sticky-save-button'),
+        skipOffstage: false,
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -1085,7 +1084,10 @@ void main() {
     );
     await _tapVisible(
       tester,
-      find.byKey(const Key('service-form-sticky-save-button'), skipOffstage: false),
+      find.byKey(
+        const Key('service-form-sticky-save-button'),
+        skipOffstage: false,
+      ),
     );
     await tester.pumpAndSettle();
 

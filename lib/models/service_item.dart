@@ -15,6 +15,7 @@ class ServiceItem {
     this.installDate,
     this.hasShelfLife = false,
     this.shelfLifeMonths,
+    this.isCustom = false,
     this.type = ServiceType.type01,
     this.units = const [],
   });
@@ -25,6 +26,11 @@ class ServiceItem {
   @Deprecated('Use shelfLifeMonths != null instead.')
   final bool hasShelfLife;
   final int? shelfLifeMonths;
+  final bool isCustom;
+
+  /// Legacy custom services used the maintenance icon before the explicit
+  /// source marker was introduced.
+  bool get isCustomService => isCustom || iconKey == 'maintenance';
 
   bool get tracksMileage => serviceOdometer != null && intervalKm != null;
   bool get tracksTime => installDate != null && shelfLifeMonths != null;
@@ -73,6 +79,7 @@ class ServiceItem {
     Object? installDate = _unset,
     Object? shelfLifeMonths = _unset,
     bool? hasShelfLife,
+    bool? isCustom,
     ServiceType? type,
     List<ServiceUnit>? units,
   }) => ServiceItem(
@@ -93,6 +100,7 @@ class ServiceItem {
         ? this.shelfLifeMonths
         : shelfLifeMonths as int?,
     hasShelfLife: hasShelfLife ?? this.hasShelfLife,
+    isCustom: isCustom ?? this.isCustom,
     type: type ?? this.type,
     units: units ?? this.units,
   );
@@ -111,6 +119,7 @@ class ServiceItem {
       'units': units.map((unit) => unit.toJson()).toList(),
     if (installDate != null) 'installDate': installDate!.toIso8601String(),
     if (shelfLifeMonths != null) 'shelfLifeMonths': shelfLifeMonths,
+    if (isCustom) 'isCustom': true,
   };
   factory ServiceItem.fromJson(Map<String, dynamic> json) {
     final type = ServiceType.fromJson(json['type']);
@@ -136,6 +145,7 @@ class ServiceItem {
           : DateTime.parse(json['installDate'] as String),
       hasShelfLife: shelfLifeMonths != null,
       shelfLifeMonths: shelfLifeMonths,
+      isCustom: json['isCustom'] == true,
       type: type,
       units: _unitsFromJson(json),
     );

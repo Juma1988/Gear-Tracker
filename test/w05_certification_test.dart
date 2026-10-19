@@ -5,6 +5,7 @@ import 'package:app/data/data.dart';
 import 'package:app/data/garage_repository.dart';
 import 'package:app/l10n/app_localizations.dart';
 import 'package:app/main.dart';
+import 'package:app/preferences/daily_odometer_preferences.dart';
 import 'package:app/models/service_item.dart';
 import 'package:app/models/vehicle_profile.dart';
 import 'package:app/screens/add_service_screen.dart';
@@ -26,6 +27,9 @@ void main() {
       history: const [],
     );
     SharedPreferences.setMockInitialValues({
+      DailyOdometerPreferences.key: DailyOdometerPreferences.dayKey(
+        DateTime.now(),
+      ),
       'garage_snapshot_v1': jsonEncode(
         GarageCollection(
           selectedVehicleId: 'long-name-vehicle',
@@ -59,10 +63,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // Explicitly target Dashboard for this header accessibility check.
+      await tester.tap(find.byKey(const Key('bottom-nav-home')));
+      await tester.pumpAndSettle();
       final vehicleControl = find.textContaining(
         'EXTRAORDINARILY LONG MANUFACTURER NAME',
       );
-      final addAction = find.byTooltip(_l10n.addService);
+      final addAction = find.byKey(const Key('bottom-nav-add-service'));
       final settingsAction = find.byTooltip(_l10n.settingsTitle);
       for (final control in [addAction, settingsAction]) {
         expect(control, findsOneWidget);
@@ -90,8 +97,13 @@ void main() {
       await tester.ensureVisible(addAction);
       await tester.tap(addAction);
       await tester.pumpAndSettle();
-      expect(find.text(_l10n.addServiceTitle), findsOneWidget);
-      await tester.pageBack();
+      expect(find.byKey(const Key('add-choice-dialog')), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('add-choice-service')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('add-choice-service')));
+      await tester.pumpAndSettle();
+      expect(find.text(_l10n.chooseIcon), findsOneWidget);
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(settingsAction);
@@ -213,10 +225,7 @@ void main() {
       final selected = tester
           .getSemantics(find.byKey(const Key('service-preset-oil')))
           .getSemanticsData();
-      expect(
-  selected.flagsCollection.isSelected,
-  equals(Tristate.isTrue),
-);
+      expect(selected.flagsCollection.isSelected, equals(Tristate.isTrue));
       expect(selected.hasAction(SemanticsAction.tap), isFalse);
       expect(selected.label, contains(_l10n.selectedLabel('Engine oil')));
       expect(selected.hint, _l10n.alreadySelectedHint);
@@ -224,7 +233,8 @@ void main() {
       expect(find.bySemanticsLabel('Air filter'), findsOneWidget);
       await tester.tap(find.byKey(const Key('service-preset-air_filter')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('add-service-name-field')), findsOneWidget);
+      expect(find.text('Air filter'), findsOneWidget);
+      expect(find.byKey(const Key('add-service-name-field')), findsNothing);
       semantics.dispose();
     },
   );

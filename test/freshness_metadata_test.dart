@@ -27,6 +27,7 @@ void main() {
       'services': <dynamic>[],
       'tires': <dynamic>[],
       'history': <dynamic>[],
+      'fuelEntries': <dynamic>[],
     };
 
     expect(GarageSnapshot.fromJson(json).lastUpdatedAt, isNull);

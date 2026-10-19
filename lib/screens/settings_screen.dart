@@ -7,6 +7,9 @@ import '../l10n/app_localizations.dart';
 import '../main.dart';
 import '../models/vehicle_profile.dart';
 import '../preferences/display_preferences.dart';
+import '../preferences/fuel_display_preferences.dart';
+import '../l10n/fuel_localizations.dart';
+import '../preferences/service_preferences.dart';
 import '../reminders/reminder_preferences.dart';
 import '../theme/app_tokens.dart';
 import '../widgets/dev_overlay.dart';
@@ -39,6 +42,8 @@ class SettingsScreen extends StatefulWidget {
     this.reminderPreferencesRepository = const ReminderPreferencesRepository(),
     this.onReminderPreferencesChanged,
     this.onCompactTireHealthChanged,
+    this.onCustomServiceChanged,
+    this.onFuelUnitChanged,
     this.repository,
     this.onGarageRestored,
     this.clipboard = const SystemGarageClipboard(),
@@ -51,6 +56,8 @@ class SettingsScreen extends StatefulWidget {
   final Future<void> Function(ReminderPreferences)?
   onReminderPreferencesChanged;
   final ValueChanged<bool>? onCompactTireHealthChanged;
+  final ValueChanged<bool>? onCustomServiceChanged;
+  final ValueChanged<FuelConsumptionUnit>? onFuelUnitChanged;
 
   /// Repository used by the backup and restore actions. Defaults to the real
   /// device-backed repository.
@@ -70,6 +77,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ReminderPreferences _reminderPreferences = const ReminderPreferences();
   bool _compactTireHealth = false;
   bool _showGuidance = true;
+  bool _customService = false;
+  FuelConsumptionUnit _fuelUnit = FuelConsumptionUnit.kmPerLiter;
+  bool _savingFuelUnit = false;
   late final GarageRepository _repository;
 
   @override
@@ -80,6 +90,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadReminderPreferences();
     _loadCompactTireHealth();
     _loadShowGuidance();
+    _loadCustomService();
+    _loadFuelUnit();
+  }
+
+  Future<void> _loadFuelUnit() async {
+    final unit = await FuelDisplayPreferences.load();
+    if (mounted) setState(() => _fuelUnit = unit);
+  }
+
+  Future<void> _openFuelUnitDialog() async {
+    if (_savingFuelUnit) return;
+    final l = AppLocalizations.of(context);
+    final selected = await showDialog<FuelConsumptionUnit>(
+      context: context,
+      builder: (dialog) => SimpleDialog(
+        title: Text(l.fuel('unitSetting')),
+        children: [
+          for (final unit in FuelConsumptionUnit.values)
+            SimpleDialogOption(
+              key: Key('fuel-unit-${unit.name}'),
+              onPressed: () => Navigator.pop(dialog, unit),
+              child: Row(
+                children: [
+                  Icon(
+                    unit == _fuelUnit
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(l.fuel(unit.labelKey))),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (selected == null || !mounted) return;
+    setState(() => _savingFuelUnit = true);
+    var saved = false;
+    try {
+      saved = await FuelDisplayPreferences.save(selected);
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _savingFuelUnit = false;
+      if (saved) _fuelUnit = selected;
+    });
+    if (saved) {
+      widget.onFuelUnitChanged?.call(selected);
+    } else {
+      _showMessage(l.fuel('unitSaveError'));
+    }
   }
 
   Future<void> _loadCompactTireHealth() async {
@@ -103,6 +165,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final value = !_showGuidance;
     setState(() => _showGuidance = value);
     await DisplayPreferences.saveShowGuidance(value);
+  }
+
+  Future<void> _loadCustomService() async {
+    final value = await ServicePreferences.loadCustomService();
+    if (mounted) setState(() => _customService = value);
+  }
+
+  Future<void> _toggleCustomService() async {
+    final value = !_customService;
+    setState(() => _customService = value);
+    await ServicePreferences.saveCustomService(value);
+    widget.onCustomServiceChanged?.call(value);
   }
 
   void _showMessage(String message) {
@@ -463,6 +537,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   compact: true,
                   onTap: _openLanguageDialog,
                 ),
+                const SizedBox(height: 12),
+                ServicePickerCard(
+                  key: const Key('settings-fuel-unit'),
+                  title: l10n.fuel('unitSetting'),
+                  subtitle: l10n.fuel(_fuelUnit.labelKey),
+                  icon: Icons.local_gas_station_outlined,
+                  compact: true,
+                  onTap: _openFuelUnitDialog,
+                ),
                 if (appState?.locale?.languageCode == 'ar') ...[
                   const SizedBox(height: 12),
                   _SettingsSwitchTile(
@@ -475,6 +558,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: (value) => appState?.setEgyptianDialect(value),
                   ),
                 ],
+              ]),
+              const SizedBox(height: 12),
+              settingsGroup(l10n.serviceCreationSection, [
+                ServicePickerCard(
+                  key: const Key('settings-custom-service-card'),
+                  title: l10n.customServicePreferenceTitle,
+                  subtitle: _customService
+                      ? l10n.customServicePreferenceOn
+                      : l10n.customServicePreferenceOff,
+                  icon: Icons.add_circle_outline,
+                  trailing: Switch(
+                    key: const Key('settings-custom-service-switch'),
+                    value: _customService,
+                    onChanged: (_) => _toggleCustomService(),
+                  ),
+                  compact: true,
+                  onTap: _toggleCustomService,
+                ),
               ]),
               const SizedBox(height: 12),
               settingsGroup(l10n.garageSection, [
